@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SESimulator", "SESimulator\SESimulator.csproj", "{BBA7A095-0AFF-44E0-912C-E7450B6AA237}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SESimulator.Dev", "SESimulator.Dev\SESimulator.Dev.csproj", "{EFE47A6A-9C2B-462D-9330-E1B99C835207}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BBA7A095-0AFF-44E0-912C-E7450B6AA237}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BBA7A095-0AFF-44E0-912C-E7450B6AA237}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BBA7A095-0AFF-44E0-912C-E7450B6AA237}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BBA7A095-0AFF-44E0-912C-E7450B6AA237}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EFE47A6A-9C2B-462D-9330-E1B99C835207}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EFE47A6A-9C2B-462D-9330-E1B99C835207}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EFE47A6A-9C2B-462D-9330-E1B99C835207}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EFE47A6A-9C2B-462D-9330-E1B99C835207}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
