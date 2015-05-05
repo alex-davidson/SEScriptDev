@@ -9,3 +9,4 @@ _ReSharper.*
 VersionInfo.cs
 Visual Studio 2010
 _NCrunch_*
+lib/se-binaries/

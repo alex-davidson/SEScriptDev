@@ -5,6 +5,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SESimulator", "SESimulator\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SESimulator.Dev", "SESimulator.Dev\SESimulator.Dev.csproj", "{EFE47A6A-9C2B-462D-9330-E1B99C835207}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.RefineryBalance", "Script.RefineryBalance\Script.RefineryBalance.csproj", "{824F0D15-4268-4C2B-BB62-386A6CF23398}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -19,6 +21,10 @@ Global
 		{EFE47A6A-9C2B-462D-9330-E1B99C835207}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EFE47A6A-9C2B-462D-9330-E1B99C835207}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EFE47A6A-9C2B-462D-9330-E1B99C835207}.Release|Any CPU.Build.0 = Release|Any CPU
+		{824F0D15-4268-4C2B-BB62-386A6CF23398}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{824F0D15-4268-4C2B-BB62-386A6CF23398}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{824F0D15-4268-4C2B-BB62-386A6CF23398}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{824F0D15-4268-4C2B-BB62-386A6CF23398}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
