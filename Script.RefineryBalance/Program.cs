@@ -2,44 +2,95 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using NUnit.Framework;
 using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
 
 namespace Script.RefineryBalance
 {
-    class Program
+    public partial class Program
     {
-        private IMyGridTerminalSystem GridTerminalSystem { get; set; }
-
+        /*
+         * 'Lean' Refinery Driver Script v1.4
+         * Alex Davidson, 13/06/2015.
+         * License: Beerware. Feel free to modify and redistribute this script, and if you think it's
+         *          worth it, maybe buy me a beer someday.
+         * 
+         * PURPOSE
+         * 
+         * Given expected maximum rate of consumption of ingot types, this script scans your stockpile
+         * and attempts to determine which type of ingot could run out first in order to prioritise
+         * refining of the appropriate ore type.
+         * 
+         * OPERATING ENVIRONMENT
+         * 
+         * This script needs:
+         *   * Names of containers holding ore (default: 'Unrefined Ore')
+         *   * Names of containers holding ingots (default: 'Raw Materials')
+         *   * Refineries set to NOT use the conveyor system (any that are using it will be ignored)
+         *   * Regular runs. Every ten seconds or so is good.
+         *   * Knowledge of the game mode's refinery and assembler speed factors.
+         *   
+         * Most of this stuff is configurable using the properties of the 'Configuration' struct below.
+         * 
+         * I suggest using a timer block because this script relies on running regularly.
+         * You can use it in high-precision mode or legacy mode:
+         *   * Legacy mode just involves setting up a timer block to run the script every ten seconds or
+         *     so. Sometimes the timer blocks lag a bit and the script might be delayed, causing refineries
+         *     to run dry for a moment.
+         *   * High-precision mode requires setting a timer block to run the script *and* trigger itself
+         *     immediately. This will cause the script to run on every update (60 times a second) and allow
+         *     it to hit its target interval more reliably.
+         * Ore distribution and other heavy computation will not happen on every call when running in
+         * high-precision mode. The script attempts to determine which mode is intended based on the
+         * time since it was last called.
+         * Modify TargetIntervalSeconds to make it run less (or more) often, but it may be CPU-intensive
+         * in some configurations so don't lower that value too much.
+         * 
+         * Changelog, v1.4
+         * ---------------
+         *   * Allow an arbitrary number of possible Refinery types.
+         *   * Add support for v1.086 new Refinery types.
+         *   * Refactor the algorithm to work with blueprints and item types, rather than assuming a
+         *     one-to-one mapping from ore type to ingot type. Adds direct support for refining scrap,
+         *     and allows modded materials to be handled properly. Note that handling of multiple input
+         *     types is still not supported because I don't know how refineries would even handle that.
+         * 
+         * Changelog, v1.3
+         * ---------------
+         *   * Fix detection of Arc Furnaces in non-English locales. Status screen is still English-only.
+         *   * Add changelog to script docs.
+         *   
+         * Changelog, v1.2
+         * ---------------
+         *   * Added support for SE v1.081 refinery upgrade modules. Material efficiency and production
+         *     speed upgrades should now be accounted for. 
+         *   * Added a 'high precision mode' for the script to try to fix timer lag. This is enabled
+         *     simply by running the script often enough, eg. using a timer in a 'Trigger Now' loop. I
+         *     have tried to ensure that the script only does minimal computation on each call until it's
+         *     time to update the refineries again so this shouldn't cause a performance problem. 
+         *   * Script is backwards-compatible with setups which trigger it on eg. a ten-second delay,
+         *     but no longer needs to be told which timer block is running it. 
+         *   * Default debug panel is now 'Debug:LeanRefinery' rather than 'Debug'. 
+         *   * Added documentation and license to the top of the script.
+         *  
+         * Changelog, v1.1
+         * ---------------
+         *   * Fixed Uranium material definition to track Uranium ingots instead of Platinum ingots. 
+         *   * Fixed a bug in prioritisation which caused the script to only sort ingot types once, then
+         *     cycle through them. 
+         *   * Made it simpler to enable Uranium management. 
+         *   * Reduced Iron bias to match the requirements of the second-most-demanding blueprint (Medical
+         *     Components, 80 ingots/sec) because the highest (Gravity Generator Components, 600 ingots/sec)
+         *     is MUCH higher and probably is not produced as often as steel plate (22 ingots/sec). 
+         *   * Added a configuration option for a status display so you can see the quota percentages of
+         *     each ingot type, with regard to number of assemblers and maximum consumption rate. This
+         *     defaults to the debug screen (block name: Debug).
+         *     
+         * v1.0, initial release.
+         */
         public struct Configuration
         {
-            /// <summary>
-            /// Unique name of the timer block running this script.
-            /// </summary>
-            public string TimerBlockName { get { return "Timer (Status Monitoring)"; } }
-            /// <summary>
-            /// Names of containers used to store unrefined ore available for processing.
-            /// </summary>
-            public string[] OreStorageContainerNames { get { return new[] { "Unrefined Ore" }; } }
-            /// <summary>
-            /// Names of containers used to store ingots available for manufacturing.
-            /// </summary>
-            public string[] IngotStorageContainerNames { get { return new[] { "Raw Materials" }; } }
-            /// <summary>
-            /// Maximum expected timer lag. Timer blocks do not fire exactly on time and may be delayed by a small amount.
-            /// Observed values fall between 0.5 and 1 second, but may vary with update rate.
-            /// </summary>
-            public float MaxTimerLagSeconds { get { return 1f; } }
-            /// <summary>
-            /// Duration of extra work to allocate to refineries on each iteration.
-            /// </summary>
-            /// <remarks>
-            /// If this is too low, refineries may occasionally run out of work when the timer is delayed.
-            /// If this is too high, it may take a while for the script to adjust to changes in ingot
-            /// consumption. A couple of seconds seems to be about right.
-            /// </remarks>
-            public float IntervalOverlapSeconds { get { return 2f; } }
-
             /// <summary>
             /// Refinery speed, defined for the map. Usually one of 1, 3 or 10.
             /// Survival Realistic is 1, Creative is 10.
@@ -50,92 +101,151 @@ namespace Script.RefineryBalance
             /// Survival Realistic is 1, Creative is 10.
             /// </summary>
             public float AssemblerEfficiencyFactor { get { return 1; } }
+            /// <summary>
+            /// Whether or not this script will attempt to manage Uranium stocks too.
+            /// Defaults to false.
+            /// </summary>
+            public bool EnableUraniumManagement { get { return false; } }
+            /// <summary>
+            /// Aim to wait only this long between each run.
+            /// </summary>
+            public int TargetIntervalSeconds { get { return 10; } }
+
+            /// <summary>
+            /// Names of containers used to store unrefined ore available for processing.
+            /// </summary>
+            public string[] OreStorageContainerNames { get { return new[] { "Unrefined Ore" }; } }
+            /// <summary>
+            /// Names of containers used to store ingots available for manufacturing.
+            /// </summary>
+            public string[] IngotStorageContainerNames { get { return new[] { "Raw Materials" }; } }
+            /// <summary>
+            /// Name of text or LCD panel to use to display ingot quotas.
+            /// Defaults to the debug screen.
+            /// </summary>
+            public string StatusDisplayName { get { return DEBUG_SCREEN; } }
+
+            /// <summary>
+            /// Maximum expected timer lag. Timer blocks do not fire exactly on time and may be
+            /// delayed by a small amount.
+            /// Commonly-observed values fall between 0.5 and 1 second, but may vary with update rate.
+            /// I have seen it exceed five seconds before.
+            /// </summary>
+            public float MaxTimerLagSeconds { get { return 2f; } }
+            /// <summary>
+            /// Duration of extra work to allocate to refineries on each iteration.
+            /// </summary>
+            /// <remarks>
+            /// If this is too low, refineries may occasionally run out of work when the timer is
+            /// delayed more than normal.
+            /// If this is too high, it may take a while for the script to adjust to changes in ingot
+            /// consumption. A couple of seconds seems to be about right.
+            /// </remarks>
+            public float IntervalOverlapSeconds { get { return 2f; } }
+            /// <summary>
+            /// Maximum interval to assume when running in legacy mode.
+            /// If the game is paused for a long period of time the script may assume that's the period
+            /// of the timer and allocate that much work to the refineries. This will delay adjustment
+            /// if the assemblers' needs change in the time it takes for that backlog to clear.
+            /// The default is two minutes. If you are using legacy mode and your timer interval is larger
+            /// than this, increase this value accordingly.
+            /// </summary>
+            public int MaxIntervalSeconds { get { return 120; } }
         }
+
+        public const string DEBUG_SCREEN = "Debug:LeanRefinery";
 
         /// <summary>
         /// Define all compute-once constants used by the script.
         /// </summary>
         /// <returns></returns>
-        Everything DefineEverything()
+        Everything DefineEverything(Configuration config)
         {
-            var materials = new[] { 
-                new Material { 
-                    OreType = new ItemType("Ore/Cobalt"), 
-                    OreConsumedPerSecond = 0.25f, 
-                    IngotType = new ItemType("Ingot/Cobalt"), 
-                    IngotsProducedPerSecond = 0.075f, 
-                    IngotsConsumedPerSecond = 220f, 
-                    IsCommonMetal = true 
-                }, 
-                new Material { 
-                    OreType = new ItemType("Ore/Gold"), 
-                    OreConsumedPerSecond = 2.5f, 
-                    IngotType = new ItemType("Ingot/Gold"), 
-                    IngotsProducedPerSecond = 0.025f, 
-                    IngotsConsumedPerSecond = 5f, 
-                }, 
-                new Material { 
-                    OreType = new ItemType("Ore/Iron"), 
-                    OreConsumedPerSecond = 20f, 
-                    IngotType = new ItemType("Ingot/Iron"), 
-                    IngotsProducedPerSecond = 14f, 
-                    IngotsConsumedPerSecond = 600f,
-                    IsCommonMetal = true 
-                }, 
-                new Material { 
-                    OreType = new ItemType("Ore/Nickel"), 
-                    OreConsumedPerSecond = 0.5f, 
-                    IngotType = new ItemType("Ingot/Nickel"), 
-                    IngotsProducedPerSecond = 0.2f, 
-                    IngotsConsumedPerSecond = 70f,
-                    IsCommonMetal = true 
-                }, 
-                new Material { 
-                    OreType = new ItemType("Ore/Magnesium"), 
-                    OreConsumedPerSecond = 1f, 
-                    IngotType = new ItemType("Ingot/Magnesium"), 
-                    IngotsProducedPerSecond = 0.007f, 
-                    IngotsConsumedPerSecond = 0.35f,
-                }, 
-                new Material { 
-                    OreType = new ItemType("Ore/Silicon"), 
-                    OreConsumedPerSecond = 1.6667f, 
-                    IngotType = new ItemType("Ingot/Silicon"), 
-                    IngotsProducedPerSecond = 1.1667f, 
-                    IngotsConsumedPerSecond = 15f, 
-                }, 
-                new Material { 
-                    OreType = new ItemType("Ore/Silver"), 
-                    OreConsumedPerSecond = 1f, 
-                    IngotType = new ItemType("Ingot/Silver"), 
-                    IngotsProducedPerSecond = 0.1f, 
-                    IngotsConsumedPerSecond = 10f,
-                }, 
-                new Material { 
-                    OreType = new ItemType("Ore/Platinum"), 
-                    OreConsumedPerSecond = 0.25f, 
-                    IngotType = new ItemType("Ingot/Platinum"), 
-                    IngotsProducedPerSecond = 0.0013f, 
-                    IngotsConsumedPerSecond = 0.4f, 
-                },
-                // Remove the /* and */ to enable Uranium management:
-                /*
-                new Material { 
-                    OreType = new ItemType("Ore/Uranium"), 
-                    OreConsumedPerSecond = 0.25f, 
-                    IngotType = new ItemType("Ingot/Platinum"), 
-                    IngotsProducedPerSecond = 0.0018f, 
-                    IngotsConsumedPerSecond = 0.01f,
+            var ingots = System.Linq.Enumerable.ToList(new[] {
+                new IngotType("Ingot/Cobalt", 220f), 
+                new IngotType("Ingot/Gold", 5f),
+                // TWEAK: Reduced Iron bias.
+                // Highest consumption rate: 600 ingots/sec (gravity generator components).
+                // Next highest: 80 ingots/sec (medical components).
+                // If you produce a lot of gravity generator components, consider increasing this.
+                new IngotType("Ingot/Iron", 80f),
+                new IngotType("Ingot/Nickel", 70f),
+                new IngotType("Ingot/Magnesium", 0.35f),
+                new IngotType("Ingot/Silicon", 15f),
+                new IngotType("Ingot/Silver", 10f),
+                new IngotType("Ingot/Platinum", 0.4f)
+            });
+            var blueprints = System.Linq.Enumerable.ToList(new[] { 
+                // Default blueprints for refining ore to ingots:
+                new Blueprint("CobaltOreToIngot", new ItemAndQuantity("Ore/Cobalt", 0.25f), new ItemAndQuantity("Ingot/Cobalt", 0.075f)),
+                new Blueprint("GoldOreToIngot", new ItemAndQuantity("Ore/Gold", 2.5f), new ItemAndQuantity("Ingot/Gold", 0.025f)),
+                new Blueprint("IronOreToIngot", new ItemAndQuantity("Ore/Iron", 20f), new ItemAndQuantity("Ingot/Iron", 14f)),
+                new Blueprint("NickelOreToIngot", new ItemAndQuantity("Ore/Nickel", 0.5f), new ItemAndQuantity("Ingot/Nickel", 0.2f)),
+                new Blueprint("MagnesiumOreToIngot", new ItemAndQuantity("Ore/Magnesium", 1f), new ItemAndQuantity("Ingot/Magnesium", 0.007f)),
+                new Blueprint("SiliconOreToIngot", new ItemAndQuantity("Ore/Silicon", 1.6667f), new ItemAndQuantity("Ingot/Silicon", 1.1667f)),
+                new Blueprint("SilverOreToIngot", new ItemAndQuantity("Ore/Silver", 1f), new ItemAndQuantity("Ingot/Silver", 0.1f)),
+                new Blueprint("PlatinumOreToIngot", new ItemAndQuantity("Ore/Platinum", 0.25f), new ItemAndQuantity("Ingot/Platinum", 0.0013f)),
+                new Blueprint("ScrapToIronIngot", new ItemAndQuantity("Ore/Scrap", 25f), new ItemAndQuantity("Ingot/Iron", 20f))
+            });
+            if(config.EnableUraniumManagement)
+            {
+                ingots.Add(new IngotType("Ingot/Uranium", 0.01f) {
                     // Increase this to maintain a uranium stockpile:
                     MinimumStockpileOverride = 0f
-                }
-                 */
+                });
+                blueprints.Add(new Blueprint("UraniumOreToIngot", new ItemAndQuantity("Ore/Uranium", 0.25f), new ItemAndQuantity("Ingot/Uranium", 0.0018f)));
             };
 
-            return new Everything(materials);
+            var refineryTypes = System.Linq.Enumerable.ToList(new[] { 
+                new RefineryType("LargeRefinery")
+                {
+                    SupportedBlueprints = { "StoneOreToIngot", "IronOreToIngot", "ScrapToIronIngot", "NickelOreToIngot", "CobaltOreToIngot",
+                        "MagnesiumOreToIngot", "SiliconOreToIngot", "SilverOreToIngot", "GoldOreToIngot", "PlatinumOreToIngot", "UraniumOreToIngot" },
+                    Efficiency = 0.8f,
+                    Speed = 1.3f
+                },
+                new RefineryType("Blast Furnace")
+                {
+                    SupportedBlueprints = { "IronOreToIngot", "ScrapToIronIngot", "NickelOreToIngot", "CobaltOreToIngot" },
+                    Efficiency = 0.9f,
+                    Speed = 1.6f
+                },
+                new RefineryType("Big Arc Furnace")
+                {
+                    SupportedBlueprints = { "IronOreToIngot", "ScrapToIronIngot", "NickelOreToIngot", "CobaltOreToIngot" },
+                    Efficiency = 0.9f,
+                    Speed = 16.8f
+                },
+                new RefineryType("BigPreciousFurnace")
+                {
+                    SupportedBlueprints = { "PlatinumOreToIngot", "SilverOreToIngot", "GoldOreToIngot" },
+                    Efficiency = 0.9f,
+                    Speed = 16.1f
+                },
+                new RefineryType("BigSolidsFurnace")
+                {
+                    SupportedBlueprints = { "StoneOreToIngot", "MagnesiumOreToIngot", "SiliconOreToIngot" },
+                    Efficiency = 0.8f,
+                    Speed = 16.2f
+                },
+                new RefineryType("BigGasCentrifugalRefinery")
+                {
+                    SupportedBlueprints = { "UraniumOreToIngot" },
+                    Efficiency = 0.95f,
+                    Speed = 16f
+                }
+            });
+
+            var ores = System.Linq.Enumerable.ToList(
+                System.Linq.Enumerable.Distinct(
+                    System.Linq.Enumerable.Select(blueprints, SelectInputItemType)));
+
+            DetectDuplicates(blueprints, SelectBlueprintName, "Duplicate blueprint name: {0}");
+
+            return new Everything(ores, ingots, blueprints, refineryTypes);
         }
         
-        Everything precomputed;
+        private Everything precomputed;
         public static Configuration configuration = new Configuration();
 
         // Recomputed on each run: 
@@ -147,11 +257,19 @@ namespace Script.RefineryBalance
         private float interval;
 
         private IMyTextPanel debugScreen;
-        private DateTime lastRun;
-
+        private long lastAllocation;
+        private long lastCall;
+        
         public void InitDebug()
         {
-            debugScreen = (IMyTextPanel)GridTerminalSystem.GetBlockWithName("Debug");
+            var needsClearing = debugScreen == null;
+            debugScreen = (IMyTextPanel)GridTerminalSystem.GetBlockWithName(DEBUG_SCREEN);
+            if (debugScreen == null) return;
+            if (needsClearing) ClearDebug();
+        }
+
+        public void ClearDebug()
+        {
             if (debugScreen == null) return;
             debugScreen.WritePublicText(String.Format("{0:dd MMM HH:mm}\n", DateTime.Now));
         }
@@ -163,20 +281,72 @@ namespace Script.RefineryBalance
             debugScreen.WritePublicText("\n", true);
         }
 
+        // If we're called more frequently than every 3 seconds, assume that the timer is in high-precision mode.
+        private static readonly long HighPrecisionThreshold = TimeSpan.FromMilliseconds(3000).Ticks;
+        // Optimisation. We never need to run more often than once in 100ms.
+        private static readonly long HighPrecisionBailout = TimeSpan.FromMilliseconds(100).Ticks;
+
         void Main()
         {
-            if (!precomputed.IsInitialised) precomputed = DefineEverything(); // One-off precomputation. 
+            var now = DateTime.Now.Ticks;
+            var ticksSinceLastCall = now - lastCall;
+            if (ticksSinceLastCall < HighPrecisionBailout) return;
+            lastCall = now;
+            if (ticksSinceLastCall < HighPrecisionThreshold)
+            {
+                // High-precision mode. Assume that the timer is calling us regularly enough that we can
+                // hit the target to a reasonable degree of accuracy.
+                if ((now - lastAllocation) / TimeSpan.TicksPerSecond < configuration.TargetIntervalSeconds) return;
+
+                interval = configuration.TargetIntervalSeconds;
+                ClearDebug();
+                WriteDebug("High-precision mode. Target interval: {0}s", configuration.TargetIntervalSeconds);
+            }
+            else
+            {
+                // Low-precision mode? We're probably being called every X seconds by a timer block. That can
+                // be expected to vary.
+                if(lastAllocation == 0) 
+                {
+                    // First run. Assume TargetIntervalSeconds between calls. This will sort itself out
+                    // next time around.
+                    interval = configuration.TargetIntervalSeconds + configuration.MaxTimerLagSeconds;
+                }
+                else
+                {
+                    var actualSecondsSinceLastAllocation = (float)(now - lastAllocation) / TimeSpan.TicksPerSecond;
+                    // If the game is paused for half an hour, don't allocate half an hour of work to the refineries.
+                    var accountForDelaysDueToPausing = Math.Min(actualSecondsSinceLastAllocation, configuration.MaxIntervalSeconds);
+                    // If the game lags briefly the threshold might be hit even in HP mode. Don't assume an 
+                    // interval shorter than that configured. Note that this takes precedence over MaxIntervalSeconds.
+                    var accountForGameLagInHighPrecisionMode = Math.Max(accountForDelaysDueToPausing, configuration.TargetIntervalSeconds);
+                    // Add a bit to account for timer lag variation.
+                    interval = accountForGameLagInHighPrecisionMode + configuration.MaxTimerLagSeconds;
+                }
+                ClearDebug();
+                WriteDebug("Legacy mode. Assumed interval: {0}s", interval);
+            }
+
+            if (!precomputed.IsInitialised)
+            {
+                precomputed = DefineEverything(configuration); // One-off precomputation. 
+                // Return immediately after precomputing, since we don't know how long it took
+                // and attempting to allocate resources too might overrun our instruction quota.
+                return;
+            }
             InitDebug();
+            
+            WriteDebug("Time since last allocation: {0:0.#}ms", (now - lastAllocation) / TimeSpan.TicksPerMillisecond);
+            lastAllocation = now;
 
-            var now = DateTime.Now;
-            WriteDebug("Time since last run: {0:0.#}ms", (now - lastRun).TotalMilliseconds);
-            lastRun = now;
+            RunAllocation();
+        }
 
-            var timerBlock = (IMyTimerBlock)GridTerminalSystem.GetBlockWithName(configuration.TimerBlockName);
-            if (timerBlock == null) throw new Exception(String.Format("Timer block not found: '{0}'", configuration.TimerBlockName));
-            // A timer's interval is not precise. There's a certain amount of lag in it, so add a second or two to account for that.
-            interval = timerBlock.TriggerDelay + configuration.MaxTimerLagSeconds;
-
+        /// <summary>
+        /// Analyses ingot stockpiles and allocates work to refineries.
+        /// </summary>
+        private void RunAllocation()
+        {
             // Get refineries which are expected to run dry before this script runs again:
             refineriesNeedingWork =
                 System.Linq.Enumerable.ToList(
@@ -199,49 +369,87 @@ namespace Script.RefineryBalance
                 System.Linq.Enumerable.ToList(
                     System.Linq.Enumerable.SelectMany(configuration.IngotStorageContainerNames, SelectCargoContainersFromName)));
 
-            // Don't bother considering materials for which we have no ore: 
-            var ingotStockpiles =
+            var allIngotStockpiles =
                 System.Linq.Enumerable.ToList(
-                    System.Linq.Enumerable.Where(
-                        System.Linq.Enumerable.Select(precomputed.Materials, AnalyseStockpile),
-                        IsOreAvailable));
+                    System.Linq.Enumerable.Select(precomputed.Ingots, AnalyseStockpile));
 
-            WriteDebug("{0} refineries needing work, {1} ore types available", refineriesNeedingWork.Count, ingotStockpiles.Count);
+            LogToStatusDisplay(allIngotStockpiles);
 
-            // Log any stockpiles which are in danger of running out:
-            for (var i = 0; i < ingotStockpiles.Count; i++)
-            {
-                var item = ingotStockpiles[i];
-                if (item.QuotaFraction < 1)
-                {
-                    WriteDebug("{0}: {1:0.##} / {2:0.##}", item.Material.IngotType.SubtypeId, item.CurrentQuantity, item.TargetQuantity);
-                }
-            }
+            // Don't bother considering materials for which we have no ore: 
+            var availableBlueprints =
+                System.Linq.Enumerable.ToList(
+                    System.Linq.Enumerable.Where(precomputed.Blueprints, IsOreAvailable));
+
+            WriteDebug("{0} refineries needing work, {1} ore types available", refineriesNeedingWork.Count, ore.Count);
 
             // Attempt to queue enough ore to keep refineries busy until we run again.
             // Prioritise materials which are 'closest' to running out and adjust those estimates
             // as work is assigned.
 
-            var stockpiles = new Stockpiles(ingotStockpiles);
+            var stockpiles = new Stockpiles(allIngotStockpiles, availableBlueprints);
             var iterator = refineriesNeedingWork.GetEnumerator();
             while (iterator.MoveNext())
             {
                 FillRefinery(iterator.Current, stockpiles);
             }
+            // Log stockpile estimates:
+            for (var i = 0; i < allIngotStockpiles.Count; i++)
+            {
+                var item = allIngotStockpiles[i];
+                WriteDebug("{0}:  {3:#000%}   {1:0.##} / {2:0.##} {4}", item.Ingot.ItemType.SubtypeId, item.EstimatedQuantity, item.TargetQuantity, item.QuotaFraction, item.QuotaFraction < 1 ? "(!)" : "");
+            }
+            WriteDebug("Total runtime this iteration: {0:0.#}ms", (DateTime.Now.Ticks - lastAllocation) / TimeSpan.TicksPerMillisecond);
+        }
+
+        private void LogToStatusDisplay(IList<IngotStockpile> allIngotStockpiles)
+        {
+            if (String.IsNullOrEmpty(configuration.StatusDisplayName)) return;
+            var statusScreen = (IMyTextPanel)GridTerminalSystem.GetBlockWithName(configuration.StatusDisplayName);
+            if (statusScreen == null) return;
+            if (statusScreen != debugScreen)
+            {
+                // Clear previous state.
+                statusScreen.WritePublicText(String.Format("Ingot stockpiles  {0:dd MMM HH:mm}\n", DateTime.Now));
+            }
+            // Log stockpiles:
+            for (var i = 0; i < allIngotStockpiles.Count; i++)
+            {
+                var item = allIngotStockpiles[i];
+                statusScreen.WritePublicText(
+                    String.Format("{0}:  {3:#000%}   {1:0.##} / {2:0.##} {4}\n", item.Ingot.ItemType.SubtypeId, item.CurrentQuantity, item.TargetQuantity, item.QuotaFraction, item.QuotaFraction < 1 ? "(!)" : ""),
+                    true);
+            }
+
         }
 
         // Lambdas
 
-        public static ItemType SelectOreType(Material material) { return material.OreType; }
-        public static float SelectOreConsumedPerSecond(Material material) { return material.OreConsumedPerSecond; }
+        public static ItemType SelectOreType(Blueprint blueprint) { return blueprint.Input.ItemType; }
+        public static float SelectOreConsumedPerSecond(Blueprint blueprint) { return blueprint.Input.QuantityPerSecond; }
         public string SelectCustomName(IMyTerminalBlock block) { return block.CustomName; }
         public bool NeedsWork(Refinery refinery) { return GetSecondsToClear(refinery) < interval; }
         public float SelectIngotProductionRate(Refinery refinery) { return refinery.IngotProductionRate; }
-        public bool IsOreAvailable(IngotStockpile stockpile) { return ore.ContainsKey(stockpile.Material.OreType); }
+        public bool IsOreAvailable(Blueprint blueprint) { return ore.ContainsKey(blueprint.Input.ItemType); }
         public IEnumerable<IMyCargoContainer> SelectCargoContainersFromName(string containerName) { return containers[containerName]; }
         public static IMyInventory SelectCargoContainerInventory(IMyCargoContainer container) { return container.GetInventory(0); }
-        public static bool IsBelowTarget(IngotStockpile stockpile) { return stockpile.QuotaFraction < 1f; }
-        public static float SelectQuotaFraction(IngotStockpile stockpile) { return stockpile.QuotaFraction; }
+        public static ItemType SelectIngotItemType(IngotStockpile stockpile) { return stockpile.Ingot.ItemType; }
+        public static string SelectBlockDefinitionString(RefineryType type) { return type.BlockDefinitionName; }
+        public static ItemType SelectInputItemType(Blueprint blueprint) { return blueprint.Input.ItemType; }
+        public static string SelectBlueprintName(Blueprint blueprint) { return blueprint.Name; }
+        public static TKey SelectGroupKey<TKey, TElement>(System.Linq.IGrouping<TKey, TElement> group) { return group.Key; }
+        public static bool IsCountMoreThanOne<T>(IEnumerable<T> set) { return System.Linq.Enumerable.Count(set) > 1; }
+
+        public static void DetectDuplicates<TItem, TKey>(IEnumerable<TItem> items, Func<TItem, TKey> selectKey, string messageFormat)
+        {
+            var duplicates = System.Linq.Enumerable.Select(
+                System.Linq.Enumerable.Where(
+                    System.Linq.Enumerable.GroupBy(items, selectKey),
+                    IsCountMoreThanOne),
+                SelectGroupKey);
+            if (!System.Linq.Enumerable.Any(duplicates)) return;
+            var anyDuplicate = System.Linq.Enumerable.FirstOrDefault(duplicates);
+            throw new Exception(String.Format(messageFormat, anyDuplicate));
+        }
 
         /// <summary>
         /// Calculate how long the specified refinery will take to run dry, taking into account
@@ -283,23 +491,26 @@ namespace Script.RefineryBalance
             // Safety margin doesn't apply to contribution to quotas.
             var assemblerDeadlineSeconds = interval - secondsToClear;
 
-            // Get candidate material types in priority order.
-            var candidates = stockpiles.GetCandidates(refinery);
+            // Get candidate blueprints in priority order.
+            var candidates = stockpiles.GetCandidateBlueprints(refinery);
 
             for (var i = 0; i < candidates.Count; i++)
             {
-                var stockpile = candidates[i];
+                var blueprint = candidates[i];
 
-                var workProvidedSeconds = TryFillRefinery(refinery, stockpile, workRequiredSeconds);
-                if (workProvidedSeconds <= 0) continue;
+                var workProvidedSeconds = TryFillRefinery(refinery, blueprint, workRequiredSeconds);
+                if (workProvidedSeconds <= 0)
+                {
+                    WriteDebug("Unable to allocate any {0}, moving to next candidate.", blueprint.Input.ItemType.SubtypeId);
+                    continue;
+                }
 
                 workRequiredSeconds -= workProvidedSeconds;
                 var workTowardsDeadline = Math.Min(assemblerDeadlineSeconds, workProvidedSeconds);
                 if (workTowardsDeadline > 0)
                 {
                     // Some of the new work will be processed before next iteration. Update our estimates.
-                    stockpile.EstimatedProduction += workTowardsDeadline * refinery.IngotProductionRate * stockpile.Material.IngotsProducedPerSecond;
-                    stockpiles.Update(stockpile);
+                    stockpiles.UpdateStockpileEstimates(refinery, blueprint, workTowardsDeadline);
                 }
                 assemblerDeadlineSeconds -= workTowardsDeadline;
 
@@ -308,27 +519,28 @@ namespace Script.RefineryBalance
                     // Refinery's work target is satisfied. It should not run dry before we run again.
                     return;
                 }
+                // WriteDebug("Allocated {0}s/{1}s of {2}.", workProvidedSeconds, origWorkRequired, stockpile.Material.OreType.SubtypeId);
             }
 
             // No more ore available for this refinery.
-            WriteDebug("{0}: No more work for this refinery.", refinery.RefineryName);
+            // WriteDebug("{0}: No more work for this refinery.", refinery.RefineryName);
         }
-
+        
         /// <summary>
-        /// Try to use the specified refinery to satisfy the given ingot stockpile's quota, up to
+        /// Try to use the specified refinery to process the specified blueprint, up to
         /// the refinery's current work target.
         /// </summary>
         /// <param name="refinery"></param>
-        /// <param name="stockpile"></param>
+        /// <param name="blueprint"></param>
         /// <param name="workRequiredSeconds">Amount of work (in seconds) this refinery needs to keep it busy until the next iteration.</param>
         /// <returns>Amount of work (in seconds) provided to this refinery.</returns>
-        private float TryFillRefinery(Refinery refinery, IngotStockpile stockpile, float workRequiredSeconds)
+        private float TryFillRefinery(Refinery refinery, Blueprint blueprint, float workRequiredSeconds)
         {
             // How much of this type of ore is required to meet the refinery's work target?
-            var oreRate = refinery.OreConsumptionRate * stockpile.Material.OreConsumedPerSecond;
+            var oreRate = refinery.OreConsumptionRate * blueprint.Input.QuantityPerSecond;
             var oreQuantityRequired = oreRate * workRequiredSeconds;
 
-            var sources = ore[stockpile.Material.OreType];
+            var sources = ore[blueprint.Input.ItemType];
 
             var workProvidedSeconds = 0f;
             // Iterate over available stacks until we run out or satisfy the quota.
@@ -348,7 +560,7 @@ namespace Script.RefineryBalance
                     // Donor inventory can't reach this refinery. Skip it.
                     continue;
                 }
-
+                
                 // Don't try to transfer more ore than the donor stack has.
                 var transfer = Math.Min(oreQuantityRequired, (float)item.Amount);
                 if (donor.TransferTo(refinery.GetOreInventory(), transfer))
@@ -369,13 +581,13 @@ namespace Script.RefineryBalance
         /// For the given material, determine how many kg of ingots are required to keep all the 
         /// assemblers fed assuming the most demanding blueprint.
         /// </summary>
-        private IngotStockpile AnalyseStockpile(Material material)
+        private IngotStockpile AnalyseStockpile(IngotType ingotType)
         {
-            var maxConsumption = material.IngotsConsumedPerSecond * interval * assemblers.Count / configuration.AssemblerEfficiencyFactor;
+            var maxConsumption = ingotType.ConsumedPerSecond * interval * assemblers.Count / configuration.AssemblerEfficiencyFactor;
             return new IngotStockpile
             {
-                Material = material,
-                CurrentQuantity = ingots.ContainsKey(material.IngotType) ? ingots[material.IngotType] : 0,
+                Ingot = ingotType,
+                CurrentQuantity = ingots.ContainsKey(ingotType.ItemType) ? ingots[ingotType.ItemType] : 0,
                 TargetQuantity = maxConsumption
             };
         }
@@ -497,10 +709,19 @@ namespace Script.RefineryBalance
             var result = new List<Refinery>();
             for (var i = 0; i < blocks.Count; i++)
             {
-                var refinery = (IMyRefinery)blocks[i];
-                if (!refinery.Enabled) continue;
-                if (refinery.UseConveyorSystem) continue;
-                result.Add(new Refinery(refinery));
+                var block = (IMyRefinery)blocks[i];
+                if (!block.Enabled) continue;
+                if (block.UseConveyorSystem) continue;
+
+                var refinery = precomputed.TryResolveRefinery(block);
+                if (refinery.HasValue)
+                {
+                    result.Add(refinery.Value);
+                }
+                else
+                {
+                    WriteDebug("Unrecognised refinery type: {0}", block.BlockDefinition);
+                }
             }
             return result;
         }
@@ -526,47 +747,64 @@ namespace Script.RefineryBalance
         /// <remarks>
         /// Ingot types for which we have no ore should already have been filtered out.
         /// </remarks>
-        public struct Stockpiles
+        public class Stockpiles
         {
-            private List<IngotStockpile> stockpiles;
-            public Stockpiles(IEnumerable<IngotStockpile> stockpiles)
+            private readonly IEnumerable<Blueprint> blueprints;
+            private Dictionary<ItemType, IngotStockpile> stockpiles;
+            public Stockpiles(IEnumerable<IngotStockpile> stockpiles, IEnumerable<Blueprint> blueprints)
             {
-                this.stockpiles = System.Linq.Enumerable.ToList(
-                    System.Linq.Enumerable.OrderBy(stockpiles, SelectQuotaFraction));
+                this.blueprints = blueprints;
+                this.stockpiles = System.Linq.Enumerable.ToDictionary(stockpiles, SelectIngotItemType);
             }
 
             public bool HasAny { get { return stockpiles.Count > 0; } }
 
-            /// <summary> 
-            /// Fetch all stockpiles whose quotas the specified refinery can contribute towards, in
-            /// descending priority order.
-            /// </summary> 
-            public IList<IngotStockpile> GetCandidates(Refinery refinery)
+            // UNIT TESTING
+            public IEnumerable<IngotStockpile> GetStockpiles()
             {
-                var candidates = new List<IngotStockpile>();
-                for (var i = 0; i < stockpiles.Count; i++)
-                {
-                    var stockpile = stockpiles[i];
-                    if (refinery.CanRefine(stockpile.Material)) candidates.Add(stockpile);
-                }
-                return candidates;
+                return stockpiles.Values;
             }
 
-            /// <summary>
-            /// Replace an entry with updated estimates.
-            /// </summary>
-            public void Update(IngotStockpile updated)
+            /// <summary> 
+            /// Fetch blueprints for all stockpiles whose quotas the specified refinery can contribute towards, in
+            /// descending priority order.
+            /// </summary> 
+            public IList<Blueprint> GetCandidateBlueprints(Refinery refinery)
             {
-                if (stockpiles.Count == 0)
+                return System.Linq.Enumerable.ToList(
+                    System.Linq.Enumerable.OrderByDescending(
+                        System.Linq.Enumerable.Where(blueprints, refinery.Supports),
+                        ScoreBlueprint));
+            }
+
+            public float ScoreBlueprint(Blueprint blueprint)
+            {
+                float score = 0;
+                for (var i = 0; i < blueprint.Outputs.Length; i++)
                 {
-                    stockpiles.Add(updated);
-                    return;
+                    var output = blueprint.Outputs[i];
+
+                    IngotStockpile stockpile;
+                    if (!stockpiles.TryGetValue(output.ItemType, out stockpile)) continue;
+
+                    score += output.QuantityPerSecond / stockpile.QuotaFraction;
                 }
-                var remove = System.Linq.Enumerable.FirstOrDefault(stockpiles, updated.IsSameMaterial);
-                stockpiles.Remove(remove);
-                stockpiles.Add(updated);
-                stockpiles = System.Linq.Enumerable.ToList(
-                    System.Linq.Enumerable.OrderBy(stockpiles, SelectQuotaFraction));
+                return score;
+            }
+
+            public void UpdateStockpileEstimates(Refinery refinery, Blueprint blueprint, float workTowardsDeadline)
+            {
+                for (var i = 0; i < blueprint.Outputs.Length; i++)
+                {
+                    var output = blueprint.Outputs[i];
+
+                    IngotStockpile stockpile;
+                    if (!stockpiles.TryGetValue(output.ItemType, out stockpile)) continue;
+
+                    stockpile.EstimatedProduction += workTowardsDeadline * refinery.IngotProductionRate * output.QuantityPerSecond;
+
+                    stockpiles[stockpile.Ingot.ItemType] = stockpile;
+                }
             }
         }
 
@@ -575,7 +813,7 @@ namespace Script.RefineryBalance
         /// </summary>
         public struct IngotStockpile
         {
-            public Material Material { get; set; }
+            public IngotType Ingot { get; set; }
             /// <summary>
             /// Units (kg) of ingots currently known to be in storage.
             /// </summary>
@@ -609,14 +847,40 @@ namespace Script.RefineryBalance
 
             public bool IsSameMaterial(IngotStockpile other)
             {
-                return Equals(other.Material, Material);
-            }
-
-            public bool CanBeRefinedBy(Refinery refinery)
-            {
-                return refinery.CanRefine(Material);
+                return Equals(other.Ingot, Ingot);
             }
         }
+
+        public static IList<float> ParseModuleBonuses(IMyRefinery refinery)
+        {
+            var percentages = new List<float>();
+            if (String.IsNullOrEmpty(refinery.DetailedInfo)) return percentages;
+
+            var lines = refinery.DetailedInfo.Split('\n');
+            // A blank line separates block info from module bonuses.
+            var foundBlankLine = false;
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i];
+                if (line.Trim() == "")
+                {
+                    if (foundBlankLine) break;
+                    foundBlankLine = true;
+                    continue;
+                }
+                if (!foundBlankLine) continue;
+
+                float percent = 100;
+                var m = rxModuleBonusPercent.Match(line);
+                if (m.Success)
+                {
+                    if (!Single.TryParse(m.Groups["p"].Value, out percent)) percent = 100;
+                }
+                percentages.Add(percent / 100);
+            }
+            return percentages;
+        }
+        private static readonly System.Text.RegularExpressions.Regex rxModuleBonusPercent = new System.Text.RegularExpressions.Regex(@":\s*(?<p>\d+)%");
 
         /// <summary>
         /// Wraps a Refinery block. Exposes processing rate information
@@ -625,25 +889,37 @@ namespace Script.RefineryBalance
         public struct Refinery
         {
             private readonly IMyRefinery block;
-            private readonly bool isArcFurnace;
+            private readonly ICollection<string> supportedBlueprints;
             private readonly float refineSpeed;
             private readonly float materialEfficiency;
 
-            private const float REFINESPEED_ARC_FURNACE = 1.6f;
-            private const float REFINESPEED_REFINERY = 1.3f;
-            private const float MATERIALEFFICIENCY_ARC_FURNACE = 0.9f;
-            private const float MATERIALEFFICIENCY_REFINERY = 0.8f;
 
-
-            public Refinery(IMyRefinery block)
+            public Refinery(IMyRefinery block, RefineryType type)
                 : this()
             {
                 this.block = block;
-                isArcFurnace = block.DefinitionDisplayNameText == "Arc furnace";
-                refineSpeed = isArcFurnace ? REFINESPEED_ARC_FURNACE : REFINESPEED_REFINERY;
-                materialEfficiency = isArcFurnace ? MATERIALEFFICIENCY_ARC_FURNACE : MATERIALEFFICIENCY_REFINERY;
+                this.supportedBlueprints = type.SupportedBlueprints;
+                refineSpeed = type.Speed;
+                materialEfficiency = type.Efficiency;
+
+                var moduleBonuses = ParseModuleBonuses(block);
+                if (moduleBonuses.Count > 0)
+                {
+                    var speedModifier = moduleBonuses[0] - 1; // +1 Speed per 100%.
+                    refineSpeed += speedModifier;
+                }
+                if (moduleBonuses.Count > 1)
+                {
+                    var efficiencyModifier = moduleBonuses[1];
+                    materialEfficiency *= efficiencyModifier;
+                }
+
                 IsValid = true;
             }
+
+
+
+
 
             public string RefineryName { get { return block.CustomName; } }
             /// <summary>
@@ -681,13 +957,12 @@ namespace Script.RefineryBalance
             public bool IsValid { get; private set; }
 
             /// <summary>
-            /// Optimisation. Skip ores that this refinery can't handle instead of iterating
+            /// Skip ores that this refinery can't handle instead of iterating
             /// all their stacks.
             /// </summary>
-            public bool CanRefine(Material material)
+            public bool Supports(Blueprint blueprint)
             {
-                if (isArcFurnace) return material.IsCommonMetal;
-                return true;
+                return supportedBlueprints.Contains(blueprint.Name);
             }
 
             /// <summary>
@@ -699,38 +974,67 @@ namespace Script.RefineryBalance
             }
         }
 
-        public struct Material
+        public struct ItemAndQuantity
         {
-            public ItemType OreType { get; set; }
+            public ItemAndQuantity(string typePath, float consumedPerSecond) : this()
+            {
+                ItemType = new ItemType(typePath);
+                QuantityPerSecond = consumedPerSecond;
+            }
+            public ItemType ItemType { get; set; }
             /// <summary> 
-            /// Units (kg) of ore consumed per second by one refinery, on Realistic settings, assuming
-            /// speed and efficiency of 1. 
-            /// Calculated as blueprint input amount divided by processing time. 
+            /// Units (kg) of the item consumed or produced per second by one refinery, on Realistic settings,
+            /// assuming speed and efficiency of 1. 
+            /// Calculated as blueprint input/output amount divided by processing time. 
             /// </summary> 
-            public float OreConsumedPerSecond { get; set; }
-            public ItemType IngotType { get; set; }
-            /// <summary> 
-            /// Units (kg) of ingots produced per second by one refinery, on Realistic settings, assuming
-            /// speed and efficiency of 1. 
-            /// Calculated as blueprint output amount divided by processing time. 
-            /// </summary> 
-            public float IngotsProducedPerSecond { get; set; }
+            public float QuantityPerSecond { get; set; }
+        }
+
+        public struct IngotType
+        {
+            public IngotType(string typePath, float consumedPerSecond)
+                : this()
+            {
+                ItemType = new ItemType(typePath);
+                ConsumedPerSecond = consumedPerSecond;
+            }
+
+            public ItemType ItemType { get; set; }
             /// <summary> 
             /// Maximum number of units (kg) of ingots consumed per second by a single assembler, on
             /// Realistic settings. 
-            /// Calculated as the largest input amount of any supported blueprint, divided by processing time. 
+            /// Calculated as the largest input amount of any supported assembler blueprint, divided by processing
+            /// time. 
             /// </summary> 
-            public float IngotsConsumedPerSecond { get; set; }
+            public float ConsumedPerSecond { get; set; }
             /// <summary> 
             /// Minimum stockpile of ingots to maintain, irrespective of consumption rate or number
             /// of assemblers.
             /// </summary> 
             public float MinimumStockpileOverride { get; set; }
+        }
 
-            /// <summary> 
-            /// If true, Arc Furnaces can refine this ore. 
-            /// </summary> 
-            public bool IsCommonMetal { get; set; }
+        public struct Blueprint
+        {
+            public Blueprint(string name, ItemAndQuantity input, params ItemAndQuantity[] outputs) : this()
+            {
+                Name = name;
+                Input = input;
+                Outputs = outputs;
+            }
+
+            /// <summary>
+            /// Name or identifier of this blueprint. Must be unique.
+            /// </summary>
+            public string Name { get; set; }
+            /// <summary>
+            /// Type of ore consumed by this blueprint.
+            /// </summary>
+            public ItemAndQuantity Input { get; set; }
+            /// <summary>
+            /// Types of ingots produced by this blueprint.
+            /// </summary>
+            public ItemAndQuantity[] Outputs { get; set; }
         }
 
         /// <summary>
@@ -775,7 +1079,7 @@ namespace Script.RefineryBalance
         /// Bookmarks an item stack in an inventory.
         /// </summary>
         /// <remarks>
-        /// ASSUMPTION: An item's 
+        /// ASSUMPTION: An item's ItemId remains the same for that stack.
         /// </remarks>
         public struct OreDonor
         {
@@ -795,14 +1099,36 @@ namespace Script.RefineryBalance
         }
 
         /// <summary>
+        /// Defines a class of Refinery block.
+        /// </summary>
+        public struct RefineryType
+        {
+            public string BlockDefinitionName { get; private set; }
+            public ICollection<string> SupportedBlueprints { get; private set; }
+            public float Efficiency { get; set; }
+            public float Speed { get; set; }
+
+            public RefineryType(string subTypeName) : this()
+            {
+                BlockDefinitionName = "MyObjectBuilder_Refinery/" + subTypeName;
+                Efficiency = 1;
+                Speed = 1;
+                SupportedBlueprints = new HashSet<string>();
+            }
+        }
+
+        /// <summary>
         /// Store some precomputed information, lookup tables, etc.
         /// </summary>
         public struct Everything
         {
             public bool IsInitialised { get; private set; }
-            public IList<Material> Materials { get; private set; }
+            public IList<Blueprint> Blueprints { get; private set; }
+            public IList<IngotType> Ingots { get; private set; }
+            public ICollection<ItemType> Ores { get; private set; }
 
             private readonly IDictionary<ItemType, float> oreConsumedPerSecond;
+            private Dictionary<string, RefineryType> refineryTypesByBlockDefinitionString;
 
 
             public float GetSecondsToClear(IMyInventoryItem item)
@@ -813,13 +1139,30 @@ namespace Script.RefineryBalance
                 return ((float)item.Amount) / perSecond;
             }
 
-            public Everything(IList<Material> materials)
+            public Everything(IList<ItemType> ores, IList<IngotType> ingots, IList<Blueprint> blueprints, IEnumerable<RefineryType> refineryTypes)
                 : this()
             {
-                Materials = materials;
-                IsInitialised = true;
+                Blueprints = blueprints;
+                Ingots = ingots;
+                Ores = new HashSet<ItemType>(ores);
 
-                oreConsumedPerSecond = System.Linq.Enumerable.ToDictionary(materials, SelectOreType, SelectOreConsumedPerSecond);
+                refineryTypesByBlockDefinitionString = System.Linq.Enumerable.ToDictionary(refineryTypes, SelectBlockDefinitionString);
+                oreConsumedPerSecond = System.Linq.Enumerable.ToDictionary(
+                    System.Linq.Enumerable.GroupBy(blueprints, SelectOreType, SelectOreConsumedPerSecond),
+                    SelectGroupKey,
+                    System.Linq.Enumerable.Max);
+
+                IsInitialised = true;
+            }
+
+            public Refinery? TryResolveRefinery(IMyRefinery block)
+            {
+                RefineryType type;
+                if(refineryTypesByBlockDefinitionString.TryGetValue(block.BlockDefinition.ToString(), out type))
+                {
+                    return new Refinery(block, type);
+                }
+                return null;
             }
         }
     }
