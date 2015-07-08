@@ -11,8 +11,8 @@ namespace Script.RefineryBalance
     public partial class Program
     {
         /*
-         * 'Lean' Refinery Driver Script v1.4
-         * Alex Davidson, 13/06/2015.
+         * 'Lean' Refinery Driver Script v1.52
+         * Alex Davidson, 08/07/2015.
          * License: Beerware. Feel free to modify and redistribute this script, and if you think it's
          *          worth it, maybe buy me a beer someday.
          * 
@@ -46,6 +46,21 @@ namespace Script.RefineryBalance
          * time since it was last called.
          * Modify TargetIntervalSeconds to make it run less (or more) often, but it may be CPU-intensive
          * in some configurations so don't lower that value too much.
+         * 
+         * Changelog, v1.5x
+         * ----------------
+         *   * HOTFIX, v1.52: Correctly apply world modifier for Assembler efficiency.
+         *   * HOTFIX, v1.52: Ignore incomplete or unpowered Refineries.
+         *   * HOTFIX, v1.52: Account for Assembler upgrade modules.
+         *   * HOTFIX, v1.51: Reimplemented MinimumStockpileOverride, which went missing in v1.4.
+         *   * Fixed a bug in scoring of blueprints which caused Iron to be prioritised over just about
+         *     everything, due to its relatively rapid rate of production.
+         *   * The above fix required a small internal API change. IngotType now demands a normalisation
+         *     factor for production rate. This usually comes from the 'default' blueprint for that ingot.
+         *   * KNOWN BUG: Material Efficiency (Effectiveness) upgrades are not properly accounted for
+         *     when dealing with high-efficiency materials like Iron and Stone. The game caps their
+         *     conversion ratio at 1:1 but the script does not, causing it to overestimate the quantities
+         *     produced in each cycle. Impact: believed to be low since Iron has a high target quota.
          * 
          * Changelog, v1.4
          * ---------------
@@ -162,18 +177,18 @@ namespace Script.RefineryBalance
         Everything DefineEverything(Configuration config)
         {
             var ingots = System.Linq.Enumerable.ToList(new[] {
-                new IngotType("Ingot/Cobalt", 220f), 
-                new IngotType("Ingot/Gold", 5f),
+                new IngotType("Ingot/Cobalt", 220f, 0.075f), 
+                new IngotType("Ingot/Gold", 5f, 0.025f),
                 // TWEAK: Reduced Iron bias.
                 // Highest consumption rate: 600 ingots/sec (gravity generator components).
                 // Next highest: 80 ingots/sec (medical components).
                 // If you produce a lot of gravity generator components, consider increasing this.
-                new IngotType("Ingot/Iron", 80f),
-                new IngotType("Ingot/Nickel", 70f),
-                new IngotType("Ingot/Magnesium", 0.35f),
-                new IngotType("Ingot/Silicon", 15f),
-                new IngotType("Ingot/Silver", 10f),
-                new IngotType("Ingot/Platinum", 0.4f)
+                new IngotType("Ingot/Iron", 80f, 14f),
+                new IngotType("Ingot/Nickel", 70f, 0.2f),
+                new IngotType("Ingot/Magnesium", 0.35f, 0.007f),
+                new IngotType("Ingot/Silicon", 15f, 1.1667f),
+                new IngotType("Ingot/Silver", 10f, 0.1f),
+                new IngotType("Ingot/Platinum", 0.4f, 0.0013f)
             });
             var blueprints = System.Linq.Enumerable.ToList(new[] { 
                 // Default blueprints for refining ore to ingots:
@@ -189,7 +204,7 @@ namespace Script.RefineryBalance
             });
             if(config.EnableUraniumManagement)
             {
-                ingots.Add(new IngotType("Ingot/Uranium", 0.01f) {
+                ingots.Add(new IngotType("Ingot/Uranium", 0.01f, 0.0018f) {
                     // Increase this to maintain a uranium stockpile:
                     MinimumStockpileOverride = 0f
                 });
@@ -250,7 +265,7 @@ namespace Script.RefineryBalance
 
         // Recomputed on each run: 
         private System.Linq.ILookup<string, IMyCargoContainer> containers;
-        private IList<IMyAssembler> assemblers;
+        private float totalAssemblerSpeed;
         private IList<Refinery> refineriesNeedingWork;
         private IDictionary<ItemType, IList<OreDonor>> ore;
         private IDictionary<ItemType, float> ingots;
@@ -358,7 +373,7 @@ namespace Script.RefineryBalance
             if (!System.Linq.Enumerable.Any(refineriesNeedingWork)) return;
 
             containers = AllCargoContainersByName();
-            assemblers = GetParticipatingAssemblers();
+            totalAssemblerSpeed = GetTotalParticipatingAssemblerSpeed();
 
             ore = CollectOreStorage(
                 System.Linq.Enumerable.ToList(
@@ -583,12 +598,12 @@ namespace Script.RefineryBalance
         /// </summary>
         private IngotStockpile AnalyseStockpile(IngotType ingotType)
         {
-            var maxConsumption = ingotType.ConsumedPerSecond * interval * assemblers.Count / configuration.AssemblerEfficiencyFactor;
+            var maxConsumption = ingotType.ConsumedPerSecond * interval * totalAssemblerSpeed * configuration.AssemblerEfficiencyFactor;
             return new IngotStockpile
             {
                 Ingot = ingotType,
                 CurrentQuantity = ingots.ContainsKey(ingotType.ItemType) ? ingots[ingotType.ItemType] : 0,
-                TargetQuantity = maxConsumption
+                TargetQuantity = Math.Max(maxConsumption, ingotType.MinimumStockpileOverride)
             };
         }
 
@@ -683,19 +698,34 @@ namespace Script.RefineryBalance
         /// <summary>
         /// Find all assemblers on-grid which are enabled and pulling from conveyors.
         /// </summary>
-        private IList<IMyAssembler> GetParticipatingAssemblers()
+        private float GetTotalParticipatingAssemblerSpeed()
         {
+            // ASSUMPTION: Only assembler type in the game has a base speed of 1.
+            const float assemblerSpeed = 1;
+
             var blocks = new List<IMyTerminalBlock>();
             GridTerminalSystem.GetBlocksOfType<IMyAssembler>(blocks);
-            var result = new List<IMyAssembler>();
+            var totalSpeed = 0f;
             for (var i = 0; i < blocks.Count; i++)
             {
                 var assembler = (IMyAssembler)blocks[i];
-                if (!assembler.Enabled) continue;
+                if (!IsBlockOperational(assembler)) continue;
                 if (!assembler.UseConveyorSystem) continue;
-                result.Add(assembler);
+
+                totalSpeed += assemblerSpeed;
+                var moduleBonuses = ParseModuleBonuses(assembler);
+                if (moduleBonuses.Count > 0)
+                {
+                    var speedModifier = moduleBonuses[0] - 1; // +1 Speed per 100%.
+                    totalSpeed += speedModifier;
+                }
             }
-            return result;
+            return totalSpeed;
+        }
+
+        private bool IsBlockOperational(IMyFunctionalBlock block)
+        {
+            return block.Enabled && block.IsFunctional && block.IsWorking;
         }
 
         /// <summary>
@@ -710,7 +740,7 @@ namespace Script.RefineryBalance
             for (var i = 0; i < blocks.Count; i++)
             {
                 var block = (IMyRefinery)blocks[i];
-                if (!block.Enabled) continue;
+                if (!IsBlockOperational(block)) continue;
                 if (block.UseConveyorSystem) continue;
 
                 var refinery = precomputed.TryResolveRefinery(block);
@@ -740,12 +770,11 @@ namespace Script.RefineryBalance
         /************************************************** DATA STRUCTURES ***********************************************/
 
         /// <summary>
-        /// Maintains a list of ingot types, sorted in ascending order of estimated quantity as a
-        /// fraction of target quantity. Or to put it another way, in descending order of priority.
-        /// The ingot type which might run out fastest should be first in the list.
+        /// Prioritises refinery work based on ingot quantities. 
+        /// The ingot type which might run out fastest should be produced first.
         /// </summary>
         /// <remarks>
-        /// Ingot types for which we have no ore should already have been filtered out.
+        /// Blueprints for which we have no ore should already have been filtered out.
         /// </remarks>
         public class Stockpiles
         {
@@ -786,8 +815,7 @@ namespace Script.RefineryBalance
 
                     IngotStockpile stockpile;
                     if (!stockpiles.TryGetValue(output.ItemType, out stockpile)) continue;
-
-                    score += output.QuantityPerSecond / stockpile.QuotaFraction;
+                    score += (output.QuantityPerSecond / stockpile.Ingot.ProductionNormalisationFactor) / stockpile.QuotaFraction;
                 }
                 return score;
             }
@@ -807,7 +835,7 @@ namespace Script.RefineryBalance
                 }
             }
         }
-
+        
         /// <summary>
         /// Records current quantities and target quantities for a material.
         /// </summary>
@@ -844,19 +872,14 @@ namespace Script.RefineryBalance
             /// most demanding blueprint then the ingots may run out.
             /// </remarks>
             public float QuotaFraction { get { return EstimatedQuantity / TargetQuantity; } }
-
-            public bool IsSameMaterial(IngotStockpile other)
-            {
-                return Equals(other.Ingot, Ingot);
-            }
         }
 
-        public static IList<float> ParseModuleBonuses(IMyRefinery refinery)
+        public static IList<float> ParseModuleBonuses(IMyTerminalBlock block)
         {
             var percentages = new List<float>();
-            if (String.IsNullOrEmpty(refinery.DetailedInfo)) return percentages;
+            if (String.IsNullOrEmpty(block.DetailedInfo)) return percentages;
 
-            var lines = refinery.DetailedInfo.Split('\n');
+            var lines = block.DetailedInfo.Split('\n');
             // A blank line separates block info from module bonuses.
             var foundBlankLine = false;
             for (var i = 0; i < lines.Length; i++)
@@ -941,6 +964,9 @@ namespace Script.RefineryBalance
             /// </summary>
             /// <remarks>
             /// ASSUMPTION: Material efficiency applies to output rather than input.
+            /// BUG: This assumes that there is no 'sanity cap' on the quantity of ingots produced from a unit of ore!
+            /// Iron refines at 70% efficiency, but with the right refinery upgrades this can be 140%.
+            /// The game caps this at 100% but this script doesn't currently have the info to do this.
             /// </remarks>
             public float IngotProductionRate
             {
@@ -992,11 +1018,12 @@ namespace Script.RefineryBalance
 
         public struct IngotType
         {
-            public IngotType(string typePath, float consumedPerSecond)
+            public IngotType(string typePath, float consumedPerSecond, float productionNormalisationFactor)
                 : this()
             {
                 ItemType = new ItemType(typePath);
                 ConsumedPerSecond = consumedPerSecond;
+                ProductionNormalisationFactor = productionNormalisationFactor;
             }
 
             public ItemType ItemType { get; set; }
@@ -1012,6 +1039,12 @@ namespace Script.RefineryBalance
             /// of assemblers.
             /// </summary> 
             public float MinimumStockpileOverride { get; set; }
+            /// <summary>
+            /// Estimated 'standard' production rate for blueprints producing this ingot.
+            /// Used to normalise the QuantityPerSecond of a blueprint's outputs so that they can be
+            /// compared sanely. Typically taken from the 'default' blueprint for a given ingot.
+            /// </summary>
+            public float ProductionNormalisationFactor { get; set; }
         }
 
         public struct Blueprint

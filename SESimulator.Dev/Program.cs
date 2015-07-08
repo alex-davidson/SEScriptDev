@@ -21,15 +21,41 @@ namespace SESimulator.Dev
             if (!Directory.Exists(gameDataRoot)) throw new ArgumentNullException(String.Format("Directory does not exist: {0}", gameDataRoot));
 
             var loader = new GameDataLoader(new GameFileLoader(gameDataRoot));
-            var localiser = loader.LoadLocalisations();
-            var gameData = loader.LoadGameData();
-            new Program(gameData, localiser).Run_CSV();
+            
+            Program.Run_BlueprintGeneration(loader);
+
+            //var localiser = loader.LoadLocalisations();
+            //var gameData = loader.LoadGameData();
+            //new Program(gameData, localiser).Run_CSV();
         }
 
         private Program(GameData gameData, Localiser localiser)
         {
             this.gameData = gameData;
             this.localiser = localiser;
+        }
+
+        private static void Run_BlueprintGeneration(GameDataLoader loader)
+        {
+            var bps = loader.LoadBlueprints();
+            foreach (var bp in bps)
+            {
+                Console.Out.Write("new Blueprint(\"{0}\"", bp.Id.SubTypeId);
+                var input = bp.Inputs.Single();
+                FormatStack(", new ItemAndQuantity(\"{0}/{1}\", {2:0.###}f / {3:0.###}f)", input, bp.BaseProductionTimeInSeconds);
+                var firstOutput = bp.Outputs.First();
+                FormatStack(",\n    new ItemAndQuantity(\"{0}/{1}\", {2:0.###}f / {3:0.###}f)", firstOutput, bp.BaseProductionTimeInSeconds);
+                foreach(var output in bp.Outputs.Skip(1))
+                {
+                    FormatStack(", new ItemAndQuantity(\"{0}/{1}\", {2:0.###}f / {3:0.###}f)", output, bp.BaseProductionTimeInSeconds);
+                }
+                Console.Out.WriteLine("),");
+            }
+        }
+
+        private static void FormatStack(string format, ItemStack stack, decimal time)
+        {
+            Console.Out.Write(format, stack.ItemId.TypeId, stack.ItemId.SubTypeId, stack.Amount, time);
         }
 
         private void Run_CSV()
@@ -129,9 +155,9 @@ namespace SESimulator.Dev
             foreach (var blueprint in blueprints)
             {
                 var produced = new Produced {
-                    IngotType = blueprint.Output.ItemId,
+                    IngotType = blueprint.Outputs.Single().ItemId,
                     OreType = blueprint.Inputs.Single().ItemId,
-                    MeanIngotsPerSecond = blueprint.Output.Amount / blueprint.BaseProductionTimeInSeconds,
+                    MeanIngotsPerSecond = blueprint.Outputs.Single().Amount / blueprint.BaseProductionTimeInSeconds,
                     MeanOrePerSecond = blueprint.Inputs.Single().Amount / blueprint.BaseProductionTimeInSeconds
                 };
                 yield return produced;

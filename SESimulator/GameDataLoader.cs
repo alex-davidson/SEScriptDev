@@ -95,7 +95,16 @@ namespace SESimulator
                 {
                     var blueprint = ReadThing<Blueprint>(x);
                     blueprint.Inputs = x.Element("Prerequisites").Elements("Item").Select(ReadItemStack).ToArray();
-                    blueprint.Output = ReadItemStack(x.Element("Result"));
+                    var outputs = x.Element("Results");
+                    if (outputs == null)
+                    {
+                        blueprint.Outputs = new[] { ReadItemStack(x.Element("Result")) };
+                    }
+                    else
+                    {
+                        blueprint.Outputs = outputs.Elements("Item").Select(ReadItemStack).ToArray();
+                    }
+
                     blueprint.BaseProductionTimeInSeconds = (decimal)x.Element("BaseProductionTimeInSeconds");
                     return blueprint;
                 });

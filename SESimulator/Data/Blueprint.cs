@@ -6,7 +6,7 @@
     public class Blueprint : Thing
     {
         public ItemStack[] Inputs { get; set; }
-        public ItemStack Output { get; set; }
+        public ItemStack[] Outputs { get; set; }
         public decimal BaseProductionTimeInSeconds {get;set;}
     }
 }
