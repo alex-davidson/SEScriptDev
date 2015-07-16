@@ -90,7 +90,7 @@ namespace SESimulator.Dev
             }
         }
 
-        private void Run()
+        private void Run_BlueprintSpeeds()
         {
             var producersAndBlueprints = gameData.FindAll<ProductionBlock>()
                 .Where(i => i.Public)
