@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
 
@@ -13,7 +14,7 @@ namespace Script.RefineryBalance.v2
         public static readonly long DEADLINE_INTERVAL_MILLISECONDS = 4; // 4ms
         /*
          * 'Lean' Refinery Driver Script v2.0
-         * Alex Davidson, 08/07/2015.
+         * Alex Davidson, 08/08/2015.
          * License: Beerware. Feel free to modify and redistribute this script, and if you think it's
          *          worth it, maybe buy me a beer someday.
          * 
@@ -32,9 +33,8 @@ namespace Script.RefineryBalance.v2
          *   
          * COMMENTS
          * 
-         * There are a lot of casts from double to float. This is because the structuress used to 
-         * configure everything take doubles in order to eliminate the need for the 'f' suffix, but
-         * we only need the precision of floats.
+         * This code uses doubles instead of floats to remove the 'f' suffix from the configuration
+         * block at the end. Performance impact should be negligible.
          */
         public static readonly long UPDATES_PER_SECOND = 60;
         public static readonly long TARGET_INTERVAL_UPDATES = UPDATES_PER_SECOND * TARGET_INTERVAL_SECONDS;
@@ -55,14 +55,16 @@ namespace Script.RefineryBalance.v2
                 return currentConfiguration == configurationString;
             }
 
+            private bool initialised;
             private SystemState state;
+            private ITransitions transitions;
 
             // If true, yielding. Run again next cycle.
             public bool Run(long start, IMyGridTerminalSystem gts)
             {
-                if (state == null)
+                if (!initialised)
                 {
-                    state = Initialise(configurationString);
+                    Initialise(configurationString);
                     return true;
                 }
 
@@ -70,56 +72,39 @@ namespace Script.RefineryBalance.v2
 
                 do
                 {
-                    if (!state.Current.Run(state, gts))
+                    if (!transitions.CurrentTask.Run(state, transitions, gts))
                     {
-                        state.Current.ReleaseResources();
+                        transitions.CurrentTask.ReleaseResources();
                         return false;
                     }
                 }
                 while (Clock.RealTicks < deadline);
 
-                state.Current.ReleaseResources();
+                transitions.CurrentTask.ReleaseResources();
                 return true;
             }
 
-            private static SystemState Initialise(string configurationString)
+            private void Initialise(string configurationString)
             {
                 DetectDuplicates(BLUEPRINTS, SelectBlueprintName, "Duplicate blueprint name: {0}");
 
                 var configuration = new ConfigurationParser().Parse(configurationString);
+                var staticState = new StaticState(configuration);
 
-                var state = new SystemState
+                state = new SystemState(staticState);
+                transitions = new TaskTransitions(staticState);
+                if (staticState.RefinerySpeedFactor.HasValue)
                 {
-                    Blueprints = new Blueprints(BLUEPRINTS),
-                    RefineryFactory = new RefineryFactory(REFINERY_TYPES)
-                };
-                state.Current = DetectRefinerySpeedTask.Initialise(state);
-                
-                var ores = System.Linq.Enumerable.ToArray(
-                    System.Linq.Enumerable.Distinct(
-                        System.Linq.Enumerable.Select(BLUEPRINTS, SelectInputItemType)));
-
-                var ingotTypes = System.Linq.Enumerable.ToArray(PrepareIngotTypes(configuration, state.Blueprints));
-
-                state.OreTypes = new OreTypes(ores, BLUEPRINTS);
-                state.IngotTypes = new IngotTypes(ingotTypes);
-                state.Ingots = new IngotStockpiles(
-                    System.Linq.Enumerable.ToArray(
-                        System.Linq.Enumerable.Select(ingotTypes, SelectStockpileFromIngotType)));
-
-                if (configuration.AssemblerSpeedFactor.HasValue) state.AssemblerSpeedFactor = configuration.AssemblerSpeedFactor.Value;
-                if (configuration.RefinerySpeedFactor.HasValue)
-                {
-                    state.RefinerySpeedFactor = configuration.RefinerySpeedFactor.Value;
-                    state.Current = WaitForDeadlineTask.Instance;
+                    transitions.WaitForDeadline();
                 }
-                state.StatusDisplayName = configuration.StatusDisplayName;
-                state.InventoryBlockNames = configuration.InventoryBlockNames;
-
-                return state;
+                else
+                {
+                    transitions.DetectRefinerySpeed();
+                }
+                initialised = true;
             }
 
-            private static void DetectDuplicates<TItem, TKey>(IEnumerable<TItem> items, Func<TItem, TKey> selectKey, string messageFormat)
+            public static void DetectDuplicates<TItem, TKey>(IEnumerable<TItem> items, Func<TItem, TKey> selectKey, string messageFormat)
             {
                 var duplicates = System.Linq.Enumerable.Select(
                     System.Linq.Enumerable.Where(
@@ -130,45 +115,209 @@ namespace Script.RefineryBalance.v2
                 var anyDuplicate = System.Linq.Enumerable.FirstOrDefault(duplicates);
                 throw new Exception(String.Format(messageFormat, anyDuplicate));
             }
-
-            class IngotConfigurer
-            {
-                private readonly IDictionary<ItemType, RequestedIngotConfiguration> ingotConfigurations;
-
-                public IngotConfigurer(IDictionary<ItemType, RequestedIngotConfiguration> ingotConfigurations)
-                {
-                    this.ingotConfigurations = ingotConfigurations;
-                }
-
-                public IngotType Configure(IngotType type)
-                {
-                    RequestedIngotConfiguration ingotConfig;
-                    if (!ingotConfigurations.TryGetValue(type.ItemType, out ingotConfig)) return type;
-                    type.Enabled = true; // Enable it if it's not already enabled.
-                    type.StockpileTargetOverride = ingotConfig.StockpileTarget;
-                    type.StockpileLimit = ingotConfig.StockpileLimit;
-                    return type;
-                }
-            }
-
-            private static IEnumerable<IngotType> PrepareIngotTypes(RequestedConfiguration configuration, Blueprints blueprints)
-            {
-                return System.Linq.Enumerable.Select(
-                    System.Linq.Enumerable.Where(
-                        System.Linq.Enumerable.Select(INGOT_TYPES, new IngotConfigurer(configuration.Ingots).Configure),
-                        IsIngotTypeEnabled),
-                    blueprints.CalculateNormalisationFactor);
-
-            }
         }
 
         public class ConfigurationParser
         {
+            class Tokeniser
+            {
+                private readonly string configurationString;
+                private int position;
+
+                public Tokeniser(string configurationString)
+                {
+                    this.configurationString = configurationString;
+                    position = -1;
+                }
+
+                public bool Next()
+                {
+                    if (position < configurationString.Length) position++;
+                    return position < configurationString.Length;
+                }
+                
+                public char Current { get { return configurationString[position]; } }
+
+                private string GetToken(int start, int end)
+                {
+                    return configurationString.Substring(start, end - start);
+                }
+
+                public string ReadString()
+                {
+                    return ReadStringFrom(position);
+                }
+
+                private string ReadStringFrom(int start)
+                {
+                    var i = start;
+                    if (IsQuote(configurationString[i]))
+                    {
+                        i++;
+                        while (i < configurationString.Length)
+                        {
+                            if (IsQuote(configurationString[i]))
+                            {
+                                position = i + 1;
+                                return GetToken(start + 1, i);
+                            }
+                            i++;
+                        }
+
+                        throw Error("Unterminated quoted string at char {0}: \"{1}", start, GetToken(position, i));
+                    }
+                    while (i < configurationString.Length && !IsTokenSeparator(configurationString[i])) i++;
+                    var str = GetToken(start, i);
+                    position = i;
+                    return str;
+                }
+
+                public void RequireNext()
+                {
+                    if (!Next()) throw Error("Unexpected end of string, after '{0}'", configurationString[configurationString.Length - 1]);
+                }
+
+                public bool TryReadParameter(out string parameterValue)
+                {
+                    parameterValue = null;
+                    if (position >= configurationString.Length) return false;
+                    if (configurationString[position] != ARG_SEPARATOR) return false;
+
+                    parameterValue = ReadStringFrom(position + 1);
+                    return true;
+                }
+
+                public bool TryReadNumericParameter(out float? parameterValue)
+                {
+                    string s;
+                    parameterValue = null;
+                    if (!TryReadParameter(out s)) return false;
+                    if (s.Length > 0)
+                    {
+                        float f;
+                        if (!Single.TryParse(s, out f)) throw Error("Unable to parse '{0}' as a valid number.", s);
+                        parameterValue = f;
+                    }
+                    return true;
+                }
+
+                private const char QUOTE = '"';
+                private const char ARG_SEPARATOR = ':';
+
+                private static bool IsQuote(char c)
+                {
+                    return c == QUOTE;
+                }
+
+                private static bool IsTokenSeparator(char c)
+                {
+                    return Char.IsWhiteSpace(c) || c == ARG_SEPARATOR;
+                }
+            }
+
             public RequestedConfiguration Parse(string configurationString)
             {
-                // TODO
+                var configuration = new RequestedConfiguration();
+                var tokeniser = new Tokeniser(configurationString);
+                while(tokeniser.Next())
+                {
+                    string parameterValue;
+                    switch (tokeniser.Current)
+                    {
+                        case '+':
+                            {
+                                tokeniser.RequireNext();
+                                ConfigureIngot(configuration, tokeniser, true);
+                                break;
+                            }
 
-                return new RequestedConfiguration();
+                        case '-':
+                            {
+                                tokeniser.RequireNext();
+                                ConfigureIngot(configuration, tokeniser, false);
+                                break;
+                            }
+                        case '/':
+                            {
+                                tokeniser.RequireNext();
+                                ParseSimpleOption(configuration, tokeniser);
+                            }
+                            break;
+
+                        default:
+                            break;
+                    }
+                    // Discard any remaining parameters:
+                    while (tokeniser.TryReadParameter(out parameterValue)) { }
+                }
+                return configuration;
+            }
+
+            private static void ConfigureIngot(RequestedConfiguration configuration, Tokeniser tokeniser, bool enableIngot)
+            {
+                var ingotName = tokeniser.ReadString();
+                var ingotConfig = ConfigureIngot(configuration, ingotName);
+                ingotConfig.Enable = enableIngot;
+                float? val;
+                if (tokeniser.TryReadNumericParameter(out val))
+                {
+                    ingotConfig.StockpileTarget = val;
+                    if (tokeniser.TryReadNumericParameter(out val))
+                    {
+                        ingotConfig.StockpileLimit = val;
+                    }
+                }
+            }
+
+            private static void ParseSimpleOption(RequestedConfiguration configuration, Tokeniser tokeniser)
+            {
+                var optionName = tokeniser.ReadString();
+                switch (optionName)
+                {
+                    case "status":
+                        string statusDisplayName;
+                        if (!tokeniser.TryReadParameter(out statusDisplayName) || statusDisplayName == "") throw Error("Expected '/status:<block name>'");
+                        configuration.StatusDisplayName = statusDisplayName;
+                        break;
+
+                    case "scan":
+                        string containerName;
+                        if (!tokeniser.TryReadParameter(out containerName) || containerName == "") throw Error("Expected '/scan:<block name>'");
+                        configuration.InventoryBlockNames.Add(containerName);
+                        break;
+
+                    case "assemblerSpeed":
+                        float? assemblerSpeed;
+                        if (!tokeniser.TryReadNumericParameter(out assemblerSpeed) || !assemblerSpeed.HasValue) throw Error("Expected '/assemblerSpeed:<number>'");
+                        configuration.AssemblerSpeedFactor = assemblerSpeed;
+                        break;
+
+                    case "refinerySpeed":
+                        float? refinerySpeed;
+                        if (!tokeniser.TryReadNumericParameter(out refinerySpeed) || !refinerySpeed.HasValue) throw Error("Expected '/refinerySpeed:<number>'");
+                        configuration.RefinerySpeedFactor = refinerySpeed;
+                        break;
+
+                    default:
+                        throw Error("Unrecognised option: '/{0}'", optionName);
+                }
+            }
+
+            private static Exception Error(string message, params object[] args)
+            {
+                return new Exception(String.Format(message, args));
+            }
+
+
+            private static RequestedIngotConfiguration ConfigureIngot(RequestedConfiguration configuration, string ingotName)
+            {
+                var itemType = ingotName.IndexOf('/') >= 0 ? new ItemType(ingotName) : new ItemType("Ingot/" + ingotName);
+                RequestedIngotConfiguration ingotConfig;
+                if (configuration.Ingots.TryGetValue(itemType, out ingotConfig)) throw new Exception("Duplicate ingot configuration: " + itemType);
+
+                ingotConfig = new RequestedIngotConfiguration();
+                configuration.Ingots.Add(itemType, ingotConfig);
+                return ingotConfig;
             }
         }
 
@@ -179,10 +328,7 @@ namespace Script.RefineryBalance.v2
             /// <summary>
             /// Returns false if no more work is immediately available.
             /// </summary>
-            /// <param name="state"></param>
-            /// <param name="gts"></param>
-            /// <returns></returns>
-            bool Run(ISystemState state, IMyGridTerminalSystem gts);
+            bool Run(ISystemState state, ITransitions transitions, IMyGridTerminalSystem gts);
 
             /// <summary>
             /// Before returning control to the game, discard references to any temporary
@@ -193,19 +339,10 @@ namespace Script.RefineryBalance.v2
 
         public class DetectRefinerySpeedTask : IScriptTask
         {
-            private static readonly DetectRefinerySpeedTask instance = new DetectRefinerySpeedTask();
-            public static IScriptTask Initialise(SystemState writableState)
+            public bool Run(ISystemState state, ITransitions transitions, IMyGridTerminalSystem gts)
             {
-                instance.writableState = writableState;
-                return instance;
-            }
-
-            private SystemState writableState;
-
-            public bool Run(ISystemState state, IMyGridTerminalSystem gts)
-            {
-                writableState.RefinerySpeedFactor = 1; // TODO
-                state.Current = WaitForDeadlineTask.Instance;
+                state.RefinerySpeedFactor = 1; // TODO
+                transitions.WaitForDeadline();
                 return true;
             }
 
@@ -216,14 +353,12 @@ namespace Script.RefineryBalance.v2
 
         public class WaitForDeadlineTask : IScriptTask
         {
-            private WaitForDeadlineTask() { }
-            public static readonly WaitForDeadlineTask Instance = new WaitForDeadlineTask();
-
-            public bool Run(ISystemState state, IMyGridTerminalSystem gts)
+            public bool Run(ISystemState state, ITransitions transitions, IMyGridTerminalSystem gts)
             {
                 if (state.NextAllocationTimestamp > Clock.GameUpdates) return false;
                 state.NextAllocationTimestamp = Clock.GameUpdates + TARGET_INTERVAL_UPDATES;
-                state.Current = CollectBlocksTask.Instance;
+                Debug.Clear();
+                transitions.CollectBlocks();
                 return true;
             }
 
@@ -234,20 +369,43 @@ namespace Script.RefineryBalance.v2
 
         public class CollectBlocksTask : IScriptTask
         {
-            private CollectBlocksTask() {}
-            public static readonly CollectBlocksTask Instance = new CollectBlocksTask();
+            private readonly IList<string> inventoryBlockNames;
 
-            public bool Run(ISystemState state, IMyGridTerminalSystem gts)
+            public CollectBlocksTask(IList<string> inventoryBlockNames)
+            {
+                this.inventoryBlockNames = inventoryBlockNames;
+            }
+
+            public bool Run(ISystemState state, ITransitions transitions, IMyGridTerminalSystem gts)
             {
                 var refineries = GetParticipatingRefineries(state, gts);
-                state.TotalAssemblerSpeed = GetTotalParticipatingAssemblerSpeed(gts) * state.AssemblerSpeedFactor;
 
-                var inventoryOwners = new List<IMyTerminalBlock>();
-                gts.GetBlocksOfType<IMyInventoryOwner>(inventoryOwners);
-                
-                state.Current = ScanContainersTask.Initialise(state, refineries, System.Linq.Enumerable.Cast<IMyInventoryOwner>(inventoryOwners));
+                var assemblerSpeedFactor = state.Static.AssemblerSpeedFactor ?? state.RefinerySpeedFactor;
+                var totalAssemblerSpeed = GetTotalParticipatingAssemblerSpeed(gts) * assemblerSpeedFactor;
+                state.Ingots.UpdateAssemblerSpeed(totalAssemblerSpeed);
+
+                var inventoryOwners = CollectUniqueContainers(gts);
+                transitions.ScanContainers(refineries, inventoryOwners);
                 
                 return true;
+            }
+
+            private IEnumerable<IMyInventoryOwner> CollectUniqueContainers(IMyGridTerminalSystem gts)
+            {
+                var blocks = new List<IMyTerminalBlock>();
+                if (inventoryBlockNames.Count == 0)
+                {
+                    gts.GetBlocksOfType<IMyInventoryOwner>(blocks);
+                    return System.Linq.Enumerable.OfType<IMyInventoryOwner>(blocks);
+                }
+                else
+                {
+                    for (var i = 0; i < inventoryBlockNames.Count; i++)
+                    {
+                        gts.SearchBlocksOfName(inventoryBlockNames[i], blocks);
+                    }
+                    return System.Linq.Enumerable.Distinct(System.Linq.Enumerable.OfType<IMyInventoryOwner>(blocks));
+                }
             }
 
             public void ReleaseResources()
@@ -269,8 +427,8 @@ namespace Script.RefineryBalance.v2
                     if (!IsBlockOperational(block)) continue;
                     if (block.UseConveyorSystem) continue;
 
-                    var refinery = state.RefineryFactory.TryResolveRefinery(block, state.RefinerySpeedFactor);
-                    if (default(Refinery).Equals(refinery))
+                    var refinery = state.Static.RefineryFactory.TryResolveRefinery(block, state.RefinerySpeedFactor);
+                    if (refinery == null)
                     {
                         Debug.Write("Unrecognised refinery type: {0}", block.BlockDefinition);
                     }
@@ -316,30 +474,29 @@ namespace Script.RefineryBalance.v2
         /// </summary>
         public class ScanContainersTask : IScriptTask
         {
-            private ScanContainersTask()
+            public ScanContainersTask(InventoryScanner scanner)
             {
+                this.scanner = scanner;
                 refineries = new List<Refinery>(ALLOC_REFINERY_COUNT);
                 inventoryOwners = new List<IMyInventoryOwner>(ALLOC_INVENTORY_OWNER_COUNT);
             }
-            private static readonly ScanContainersTask instance = new ScanContainersTask();
 
-            public static ScanContainersTask Initialise(ISystemState state, IList<Refinery> refineries, IEnumerable<IMyInventoryOwner> inventoryOwners)
+            public void Initialise(IEnumerable<Refinery> refineries, IEnumerable<IMyInventoryOwner> inventoryOwners)
             {
-                instance.refineries.Clear();
-                instance.refineries.AddRange(refineries);
+                this.refineries.Clear();
+                this.refineries.AddRange(refineries);
 
-                instance.inventoryOwners.Clear();
-                instance.inventoryOwners.AddRange(inventoryOwners);
+                this.inventoryOwners.Clear();
+                this.inventoryOwners.AddRange(inventoryOwners);
 
-                instance.scanner = InventoryScanner.Initialise(state.IngotTypes.All, state.OreTypes.All);
-                return instance;
+                this.scanner.Reset();
             }
 
             private readonly List<Refinery> refineries;
             private readonly List<IMyInventoryOwner> inventoryOwners;
-            private InventoryScanner scanner;
+            private readonly InventoryScanner scanner;
 
-            public bool Run(ISystemState state, IMyGridTerminalSystem gts)
+            public bool Run(ISystemState state, ITransitions transitions, IMyGridTerminalSystem gts)
             {
                 if (inventoryOwners.Count > 0)
                 {
@@ -348,11 +505,10 @@ namespace Script.RefineryBalance.v2
                     return true;
                 }
 
-                state.Ingots.UpdateAssemblerSpeed(state.TotalAssemblerSpeed);
                 state.Ingots.UpdateQuantities(scanner.Ingots);
 
                 LogToStatusDisplay(state, gts);
-                state.Current = AllocateWorkTask.Initialise(refineries, scanner.Ore);
+                transitions.AllocateWork(refineries, scanner.Ore);
                 return true;
             }
 
@@ -360,8 +516,8 @@ namespace Script.RefineryBalance.v2
             {
                 state.Ingots.LogToStatusDisplay(Debug.DebugPanel);
 
-                if (String.IsNullOrEmpty(state.StatusDisplayName)) return;
-                var statusScreen = (IMyTextPanel)gts.GetBlockWithName(state.StatusDisplayName);
+                if (String.IsNullOrEmpty(state.Static.StatusDisplayName)) return;
+                var statusScreen = (IMyTextPanel)gts.GetBlockWithName(state.Static.StatusDisplayName);
                 if (statusScreen == null || statusScreen == Debug.DebugPanel) return;
 
                 // Clear previous state.
@@ -378,33 +534,32 @@ namespace Script.RefineryBalance.v2
 
         public class AllocateWorkTask : IScriptTask
         {
-            private AllocateWorkTask()
+            public AllocateWorkTask(RefineryWorklist refineryWorklist)
             {
-                oreDonors = new Dictionary<ItemType, List<OreDonor>>(ALLOC_ORE_TYPE_COUNT);
+                this.refineryWorklist = refineryWorklist;
             }
-            private static readonly AllocateWorkTask instance = new AllocateWorkTask();
 
-            public static AllocateWorkTask Initialise(IList<Refinery> refineries, IDictionary<ItemType, List<OreDonor>> oreDonors)
+            public void Initialise(IList<Refinery> refineries, IDictionary<ItemType, List<OreDonor>> oreDonors)
             {
-                instance.refineries = RefineryWorklist.Initialise(refineries);
+                this.refineryWorklist.Initialise(refineries);
 
-                instance.oreDonors.Clear();
+                this.oreDonors.Clear();
                 var oreDonorsIterator = oreDonors.GetEnumerator();
-                while(oreDonorsIterator.MoveNext()) instance.oreDonors.Add(oreDonorsIterator.Current.Key, oreDonorsIterator.Current.Value);
-                return instance;
+                while(oreDonorsIterator.MoveNext()) this.oreDonors.Add(oreDonorsIterator.Current.Key, oreDonorsIterator.Current.Value);
             }
 
-            private RefineryWorklist refineries;
-            private Dictionary<ItemType, List<OreDonor>> oreDonors;
+            private readonly Dictionary<ItemType, List<OreDonor>> oreDonors = new Dictionary<ItemType, List<OreDonor>>(ALLOC_ORE_TYPE_COUNT);
             private IngotWorklist ingotWorklist;
-
-            public bool Run(ISystemState state, IMyGridTerminalSystem gts)
+            private RefineryWorklist refineryWorklist;
+            
+            public bool Run(ISystemState state, ITransitions transitions, IMyGridTerminalSystem gts)
             {
-                if (ingotWorklist == null) ingotWorklist = state.Ingots.GetWorklist(); 
+                if (ingotWorklist == null) ingotWorklist = state.Ingots.GetWorklist();
 
-                if (AllocateSingle(state)) return true;
-
-                state.Current = WaitForDeadlineTask.Instance;
+                if (AllocateSingle()) return true;
+                
+                transitions.WaitForDeadline();
+                Refinery.ReleaseAll();
                 return false;
             }
 
@@ -412,20 +567,30 @@ namespace Script.RefineryBalance.v2
             {
                 // Release sorted ingot list at the end of each iteration to avoid gen2 promotion.
                 ingotWorklist = null;
+                refineryWorklist.ReleaseResources();
             }
 
-            private bool AllocateSingle(ISystemState state)
+            private bool AllocateSingle()
             {
-                // TODO
-
-                // if no refineries need work, return false
-                // if no ore available, return false
+                IngotStockpile preferred;
+                while (ingotWorklist.TryGetPreferred(out preferred))
+                {
+                    var type = preferred.Ingot.ItemType;
+                    IRefineryIterator refineries;
+                    if (refineryWorklist.TrySelectIngot(type, out refineries))
+                    {
+                        do
+                        {
+                            if (FillCurrentRefinery(refineries)) return true; // Yield as soon as we've allocated work.
+                        } while (refineries.CanAllocate()); // Otherwise keep looking for a refinery which can do something.
+                    }
+                    ingotWorklist.Skip();
+                }
                 return false;
             }
-
+            
             /// <summary>
             /// Provide the specified refinery with enough work to keep it busy until the next iteration.
-            /// Prefer ore types which yield ingots which are in heavy demand.
             /// </summary>
             /// <remarks>
             /// Ore already being processed is not considered when estimating how many ingots will be produced.
@@ -433,69 +598,39 @@ namespace Script.RefineryBalance.v2
             /// and the amount of ore in flight should be insignificant in comparison (approx. one
             /// 'IntervalOverlapSeconds'); it's not worth the hassle to calculate it.
             /// </remarks>
-            private void FillRefinery(ISystemState state, Refinery refinery, IngotStockpile stockpile)
+            private bool FillCurrentRefinery(IRefineryIterator worklist)
             {
-                var secondsToClear = GetSecondsToClear(state.OreTypes, refinery);
+                var assignedWork = false;
                 // How much work does this refinery need to keep it busy until the next iteration, with a safety margin?
-                var workRequiredSeconds = TARGET_INTERVAL_SECONDS + OVERLAP_INTERVAL_SECONDS - secondsToClear;
-                if (workRequiredSeconds <= 0) return;
-
-                // This is how much of the newly-assigned work can be applied against production targets.
-                // Safety margin doesn't apply to contribution to quotas.
-                var assemblerDeadlineSeconds = TARGET_INTERVAL_SECONDS - secondsToClear;
+                Debug.Assert(worklist.PreferredWorkSeconds > 0, "PreferredWorkSeconds <= 0");
 
                 // Get candidate blueprints in priority order.
-                var candidates =
-                    System.Linq.Enumerable.ToArray(
-                        System.Linq.Enumerable.OrderByDescending(
-                            state.Blueprints.GetBlueprintsProducing(stockpile.Ingot.ItemType),
-                            ingotWorklist.ScoreBlueprint));
+                var candidates = System.Linq.Enumerable.ToArray(
+                        System.Linq.Enumerable.OrderByDescending(worklist.GetCandidateBlueprints(), ingotWorklist.ScoreBlueprint));
 
                 for (var i = 0; i < candidates.Length; i++)
                 {
                     var blueprint = candidates[i];
 
-                    var workProvidedSeconds = TryFillRefinery(refinery, blueprint, workRequiredSeconds);
+                    var workProvidedSeconds = TryFillRefinery(worklist.Current, blueprint, worklist.PreferredWorkSeconds);
                     if (workProvidedSeconds <= 0)
                     {
                         Debug.Write("Unable to allocate any {0}, moving to next candidate.", blueprint.Input.ItemType.SubtypeId);
                         continue;
                     }
-
-                    workRequiredSeconds -= workProvidedSeconds;
-                    var workTowardsDeadline = Math.Min(assemblerDeadlineSeconds, workProvidedSeconds);
-                    if (workTowardsDeadline > 0)
+                    assignedWork = true;
+                    var isRefinerySatisfied = worklist.AssignedWork(ref workProvidedSeconds);
+                    if (workProvidedSeconds > 0)
                     {
                         // Some of the new work will be processed before next iteration. Update our estimates.
-                        ingotWorklist.UpdateStockpileEstimates(refinery, blueprint, workTowardsDeadline);
+                        ingotWorklist.UpdateStockpileEstimates(worklist.Current, blueprint, workProvidedSeconds);
                     }
-                    assemblerDeadlineSeconds -= workTowardsDeadline;
-
-                    if (workRequiredSeconds <= 0)
-                    {
-                        // Refinery's work target is satisfied. It should not run dry before we run again.
-                        return;
-                    }
+                    // If the refinery's work target is satisfied, it should not run dry before we run again.
+                    if (isRefinerySatisfied) break;
                 }
 
                 // No more ore available for this refinery.
-            }
-
-            /// <summary>
-            /// Calculate how long the specified refinery will take to run dry, taking into account
-            /// refinery speed and ore type.
-            /// </summary>
-            /// <param name="refinery"></param>
-            /// <returns></returns>
-            private static float GetSecondsToClear(OreTypes oreTypes, Refinery refinery)
-            {
-                var items = refinery.GetOreInventory().GetItems();
-                float time = 0;
-                for (var i = 0; i < items.Count; i++)
-                {
-                    time += oreTypes.GetSecondsToClear(items[i]);
-                }
-                return time / refinery.OreConsumptionRate;
+                return assignedWork;
             }
 
             /// <summary>
@@ -506,15 +641,15 @@ namespace Script.RefineryBalance.v2
             /// <param name="blueprint"></param>
             /// <param name="workRequiredSeconds">Amount of work (in seconds) this refinery needs to keep it busy until the next iteration.</param>
             /// <returns>Amount of work (in seconds) provided to this refinery.</returns>
-            private float TryFillRefinery(Refinery refinery, Blueprint blueprint, float workRequiredSeconds)
+            private double TryFillRefinery(Refinery refinery, Blueprint blueprint, double workRequiredSeconds)
             {
                 // How much of this type of ore is required to meet the refinery's work target?
-                var oreRate = refinery.OreConsumptionRate * (float)blueprint.Input.Quantity;
+                var oreRate = refinery.OreConsumptionRate * blueprint.Input.Quantity;
                 var oreQuantityRequired = oreRate * workRequiredSeconds;
 
                 var sources = new OreDonorsIterator(oreDonors[blueprint.Input.ItemType]);
 
-                var workProvidedSeconds = 0f;
+                double workProvidedSeconds = 0;
                 // Iterate over available stacks until we run out or satisfy the quota.
                 while(sources.Next())
                 {
@@ -533,7 +668,7 @@ namespace Script.RefineryBalance.v2
                     }
 
                     // Don't try to transfer more ore than the donor stack has.
-                    var transfer = Math.Min(oreQuantityRequired, (float)item.Amount);
+                    var transfer = Math.Min(oreQuantityRequired, (double)item.Amount);
                     if (donor.TransferTo(refinery.GetOreInventory(), transfer))
                     {
                         // Update our estimates based on the transfer succeeding.
@@ -550,37 +685,166 @@ namespace Script.RefineryBalance.v2
         }
 
         #endregion
-
+        
         public interface ISystemState
         {
             // Configuration
-            RefineryFactory RefineryFactory { get; }
-            Blueprints Blueprints { get; }
-            OreTypes OreTypes { get; }
-            IngotTypes IngotTypes { get; }
-            string StatusDisplayName { get; }
-            float RefinerySpeedFactor { get; }
-            float AssemblerSpeedFactor { get; }
-            ICollection<string> InventoryBlockNames { get; }
+            StaticState Static { get; }
+
+            float RefinerySpeedFactor { get; set; }
 
             // State maintained between iterations
             long NextAllocationTimestamp { get; set; }
             float TotalAssemblerSpeed { get; set; }
             IngotStockpiles Ingots { get; }
 
-            // Currently-executing task
-            IScriptTask Current { get; set; }
         }
-        
+
+        public interface ITransitions
+        {
+            void DetectRefinerySpeed();
+            void WaitForDeadline();
+            void CollectBlocks();
+            void ScanContainers(IEnumerable<Refinery> refineries, IEnumerable<IMyInventoryOwner> inventoryOwners);
+            void AllocateWork(IList<Refinery> refineries, IDictionary<ItemType, List<OreDonor>> oreDonors);
+
+            // Currently-executing task
+            IScriptTask CurrentTask { get; }
+        }
+
+        public class TaskTransitions : ITransitions
+        {
+            private readonly DetectRefinerySpeedTask detectRefinerySpeedTask;
+            private readonly WaitForDeadlineTask waitForDeadlineTask;
+            private readonly CollectBlocksTask collectBlocksTask;
+            private readonly ScanContainersTask scanContainersTask;
+            private readonly AllocateWorkTask allocateWorkTask;
+
+            public TaskTransitions(StaticState staticState)
+            {
+                detectRefinerySpeedTask = new DetectRefinerySpeedTask();
+                waitForDeadlineTask = new WaitForDeadlineTask();
+                collectBlocksTask = new CollectBlocksTask(staticState.InventoryBlockNames);
+                scanContainersTask = new ScanContainersTask(new InventoryScanner(staticState.IngotTypes.AllItemTypes, staticState.OreTypes.All));
+                allocateWorkTask = new AllocateWorkTask(new RefineryWorklist(staticState.OreTypes, staticState.IngotTypes, staticState.RefineryFactory, staticState.Blueprints));
+                CurrentTask = waitForDeadlineTask;
+            }
+
+            public void DetectRefinerySpeed()
+            {
+                CurrentTask.ReleaseResources();
+                CurrentTask = detectRefinerySpeedTask;
+            }
+
+            public void WaitForDeadline()
+            {
+                CurrentTask.ReleaseResources();
+                CurrentTask = waitForDeadlineTask;
+            }
+
+            public void CollectBlocks()
+            {
+                CurrentTask.ReleaseResources();
+                CurrentTask = collectBlocksTask;
+            }
+
+            public void ScanContainers(IEnumerable<Refinery> refineries, IEnumerable<IMyInventoryOwner> inventoryOwners)
+            {
+                scanContainersTask.Initialise(refineries, inventoryOwners);
+                CurrentTask.ReleaseResources();
+                CurrentTask = scanContainersTask;
+            }
+
+            public void AllocateWork(IList<Refinery> refineries, IDictionary<ItemType, List<OreDonor>> oreDonors)
+            {
+ 	            allocateWorkTask.Initialise(refineries, oreDonors);
+                CurrentTask.ReleaseResources();
+                CurrentTask = allocateWorkTask;
+            }
+
+            public IScriptTask CurrentTask { get; private set; }
+        }
+
+        public class StaticState
+        {
+            public StaticState(RequestedConfiguration configuration)
+            {
+                Blueprints = new Blueprints(BLUEPRINTS);
+                RefineryFactory = new RefineryFactory(REFINERY_TYPES);
+                
+                var ores = System.Linq.Enumerable.ToArray(
+                    System.Linq.Enumerable.Distinct(
+                        System.Linq.Enumerable.Select(BLUEPRINTS, SelectInputItemType)));
+
+                OreTypes = new OreTypes(ores, BLUEPRINTS);
+
+                var ingotTypes = System.Linq.Enumerable.ToArray(PrepareIngotTypes(configuration, Blueprints, RefineryFactory));
+                IngotTypes = new IngotTypes(ingotTypes);
+                
+                RefinerySpeedFactor = configuration.RefinerySpeedFactor;
+                AssemblerSpeedFactor = configuration.AssemblerSpeedFactor;
+                StatusDisplayName = configuration.StatusDisplayName;
+                InventoryBlockNames = configuration.InventoryBlockNames;
+            }
+
+            public RefineryFactory RefineryFactory { get; private set; }
+            public Blueprints Blueprints { get; private set; }
+            public OreTypes OreTypes { get; private set; }
+            public IngotTypes IngotTypes { get; private set; }
+            public IList<string> InventoryBlockNames { get; private set; }
+
+            public string StatusDisplayName { get; private set; }
+            public float? RefinerySpeedFactor { get; private set; }
+            public float? AssemblerSpeedFactor { get; private set; }
+
+            class IngotConfigurer
+            {
+                private readonly IDictionary<ItemType, RequestedIngotConfiguration> ingotConfigurations;
+
+                public IngotConfigurer(IDictionary<ItemType, RequestedIngotConfiguration> ingotConfigurations)
+                {
+                    this.ingotConfigurations = ingotConfigurations;
+                }
+
+                public IngotType Configure(IngotType type)
+                {
+                    RequestedIngotConfiguration ingotConfig;
+                    if (!ingotConfigurations.TryGetValue(type.ItemType, out ingotConfig)) return type;
+                    type.Enabled = true; // Enable it if it's not already enabled.
+                    type.StockpileTargetOverride = ingotConfig.StockpileTarget;
+                    type.StockpileLimit = ingotConfig.StockpileLimit;
+                    return type;
+                }
+            }
+
+            private static IEnumerable<IngotType> PrepareIngotTypes(RequestedConfiguration configuration, Blueprints blueprints, RefineryFactory refineryFactory)
+            {
+                return System.Linq.Enumerable.Select(
+                    System.Linq.Enumerable.Where(
+                        System.Linq.Enumerable.Select(INGOT_TYPES, new IngotConfigurer(configuration.Ingots).Configure),
+                        IsIngotTypeEnabled),
+                    blueprints.CalculateNormalisationFactor);
+
+            }
+
+            public bool FilterInventoryBlock(IMyTerminalBlock block)
+            {
+                if (InventoryBlockNames.Count == 0) return true;
+                return InventoryBlockNames.Contains(block.CustomName);
+            }
+        }
+
         public class SystemState : ISystemState
         {
-            public RefineryFactory RefineryFactory { get; set; }
-            public Blueprints Blueprints { get; set; }
-            public OreTypes OreTypes { get; set; }
-            public IngotTypes IngotTypes { get; set; }
-            public ICollection<string> InventoryBlockNames { get; set; }
+            public SystemState(StaticState staticState)
+            {
+                Static = staticState;
+                Ingots = new IngotStockpiles(
+                    System.Linq.Enumerable.ToArray(
+                        System.Linq.Enumerable.Select(staticState.IngotTypes.All, i => new IngotStockpile(i))));
+            }
 
-            public string StatusDisplayName { get; set; }
+            public StaticState Static {get; private set;}
 
             private float? refinerySpeedFactor;
             public float RefinerySpeedFactor
@@ -588,81 +852,235 @@ namespace Script.RefineryBalance.v2
                 get { return refinerySpeedFactor ?? 1; } // Assume the worst (1) until we can detect it.
                 set { if(value > 0) refinerySpeedFactor = value; }
             }
-            private float? assemblerSpeedFactor;
-            public float AssemblerSpeedFactor
-            {
-                get { return assemblerSpeedFactor ?? RefinerySpeedFactor; } // Assume same as refineries unless otherwise specified.
-                set { if (value > 0) assemblerSpeedFactor = value; }
-            }
 
 
             // Maintained between iterations, therefore must be SystemState properties:
 
             public long NextAllocationTimestamp { get; set; } // Timestamps are 'game time', counting update ticks.
             public float TotalAssemblerSpeed { get; set; }
-            public IngotStockpiles Ingots { get; set; }
-
-            public IScriptTask Current { get; set; }
+            public IngotStockpiles Ingots { get; private set; }
         }
 
         public class RefineryWorklist
         {
-            private RefineryWorklist()
+            private readonly OreTypes oreTypes;
+            private readonly HashSet<Refinery> refineries = new HashSet<Refinery>();
+            
+            private readonly Dictionary<KeyValuePair<ItemType, string>, Blueprint[]> blueprintsByIngotTypeAndBlockDefinition;
+            private readonly Dictionary<ItemType, string[]> blockDefinitionsByIngotType;
+           
+            public RefineryWorklist(OreTypes oreTypes, IngotTypes ingotTypes, RefineryFactory refineryFactory, Blueprints blueprints)
             {
-                refineriesBySpeed = new List<Refinery>(ALLOC_REFINERY_COUNT);
-                refineriesByEfficiency = new List<Refinery>(ALLOC_REFINERY_COUNT);
-            }
-            private static RefineryWorklist instance;
-
-            public static RefineryWorklist Initialise(IList<Refinery> refineries)
-            {
+                this.oreTypes = oreTypes;
+                iterators = new Dictionary<ItemType, IRefineryIterator>(ingotTypes.All.Count);
                 
-                return instance;
+                blueprintsByIngotTypeAndBlockDefinition = new Dictionary<KeyValuePair<ItemType, string>, Blueprint[]>(refineryFactory.AllTypes.Count * ingotTypes.All.Count);
+                blockDefinitionsByIngotType = new Dictionary<ItemType, string[]>(ingotTypes.All.Count);
+                foreach (var ingotType in ingotTypes.AllItemTypes)
+                {
+                    var bps = blueprints.GetBlueprintsProducing(ingotType);
+                    var blocks = new List<string>(refineryFactory.AllTypes.Count);
+                    foreach (var refineryType in refineryFactory.AllTypes)
+                    {
+                        var matchingBps = System.Linq.Enumerable.ToArray(
+                                System.Linq.Enumerable.Where(bps, refineryType.Supports));
+                        var key = new KeyValuePair<ItemType, string>(ingotType, refineryType.BlockDefinitionName);
+                        blueprintsByIngotTypeAndBlockDefinition.Add(key, matchingBps);
+                        if(matchingBps.Length > 0) blocks.Add(refineryType.BlockDefinitionName);
+                    }
+                    blockDefinitionsByIngotType.Add(ingotType, blocks.ToArray());
+                }
+
+            }
+            
+            public void Initialise(IList<Refinery> refineries)
+            {
+                this.refineries.Clear();
+                this.refineries.UnionWith(refineries);
+                refineriesByBlockDefinition = System.Linq.Enumerable.ToLookup(refineries, r => r.BlockDefinitionString);
             }
 
-            private List<Refinery> refineriesBySpeed;
-            private List<Refinery> refineriesByEfficiency;
+            private readonly Dictionary<ItemType, IRefineryIterator> iterators;
+            public bool TrySelectIngot(ItemType ingotType, out IRefineryIterator iterator)
+            {
+                if (!iterators.TryGetValue(ingotType, out iterator))
+                {
+                    var definitions = blockDefinitionsByIngotType[ingotType];
+                    if (definitions.Length == 0) return false;
+
+                    InitResources();
+
+                    var sortedList = System.Linq.Enumerable.ToList(
+                            System.Linq.Enumerable.OrderByDescending(
+                                System.Linq.Enumerable.SelectMany(definitions, d => refineriesByBlockDefinition[d]),
+                                r => r.TheoreticalIngotProductionRate));
+
+                    iterator = new RefineryIterator(this, ingotType, sortedList);
+                    iterators.Add(ingotType, iterator);
+                }
+                return iterator.CanAllocate();
+            }
+
+            private System.Linq.ILookup<string, Refinery> refineriesByBlockDefinition;
+
+            private void InitResources()
+            {
+                refineriesByBlockDefinition = refineriesByBlockDefinition ?? System.Linq.Enumerable.ToLookup(refineries, r => r.BlockDefinitionString);
+            }
+
+            public void ReleaseResources()
+            {
+                iterators.Clear();
+                refineriesByBlockDefinition = null;
+            }
+
+
+            class RefineryIterator : IRefineryIterator
+            {
+                private int index;
+                private bool valid;
+                private readonly RefineryWorklist worklist;
+                private readonly ItemType ingotType;
+                private readonly List<Refinery> refineries;
+                private Blueprint[] candidateBlueprints;
+
+                public RefineryIterator(RefineryWorklist worklist, ItemType ingotType, List<Refinery> refineries)
+                {
+                    this.worklist = worklist;
+                    this.ingotType = ingotType;
+                    this.refineries = refineries;
+                    index = 0;
+                    valid = false;
+                }
+
+                public Blueprint[] GetCandidateBlueprints()
+                {
+                    candidateBlueprints = candidateBlueprints ?? worklist.blueprintsByIngotTypeAndBlockDefinition[new KeyValuePair<ItemType, string>(ingotType, Current.BlockDefinitionString)];
+                    return candidateBlueprints;
+                }
+
+                public Refinery Current
+                {
+                    get { return refineries[index]; }
+                }
+
+                public bool CanAllocate()
+                {
+                    if (valid) return true;
+                    candidateBlueprints = null;
+                    while (index < refineries.Count)
+                    {
+                        if (TrySelectRefinery(refineries[index])) return true;
+                        index++;
+                    }
+                    return false;
+                }
+
+                private bool TrySelectRefinery(Refinery refinery)
+                {
+                    RequiredWorkSeconds = TARGET_INTERVAL_SECONDS - refinery.GetSecondsToClear(worklist.oreTypes);
+                    PreferredWorkSeconds += RequiredWorkSeconds + OVERLAP_INTERVAL_SECONDS;
+                    return PreferredWorkSeconds > 0;
+                }
+
+                /// <summary>
+                /// Returns true when the refinery is 'full'.
+                /// Parameter is updated to the amount of work counted against 'required'.
+                /// </summary>
+                /// <param name="seconds"></param>
+                /// <returns></returns>
+                public bool AssignedWork(ref double seconds)
+                {
+                    Debug.Assert(valid, "Assigned work while valid == false.");
+                    PreferredWorkSeconds -= seconds;
+                    if (RequiredWorkSeconds < seconds)
+                    {
+                        seconds = RequiredWorkSeconds;
+                        RequiredWorkSeconds = 0;
+                    }
+                    else
+                    {
+                        RequiredWorkSeconds -= seconds;
+                    }
+                    if (PreferredWorkSeconds <= 0)
+                    {
+                        PreferredWorkSeconds = 0;
+                        worklist.refineries.Remove(Current);
+                        Skip();
+                        return true;
+                    }
+                    return false;
+                }
+
+                // How much work does this refinery need to keep it busy until the next iteration, with a safety margin?
+                public double PreferredWorkSeconds { get; private set; }
+                // This is how much of the newly-assigned work can be applied against production targets.
+                // Safety margin doesn't apply to contribution to quotas.
+                public double RequiredWorkSeconds { get; private set; }
+
+                public void Skip()
+                {
+                    valid = false;
+                    index++;
+                }
+            }
+
+        }
+
+        public interface IRefineryIterator
+        {
+            void Skip();
+            bool AssignedWork(ref double seconds);
+            Refinery Current { get; }
+            double PreferredWorkSeconds { get; }
+            double RequiredWorkSeconds { get; }
+            bool CanAllocate();
+            Blueprint[] GetCandidateBlueprints();
         }
 
         public class InventoryScanner
         {
-            private InventoryScanner()
+            public InventoryScanner(IEnumerable<ItemType> ingotTypes, IEnumerable<ItemType> oreTypes)
             {
-                Ore = new Dictionary<ItemType, List<OreDonor>>(ALLOC_ORE_TYPE_COUNT);
-                Ingots = new Dictionary<ItemType, float>(ALLOC_INGOT_TYPE_COUNT);
-            }
-            private static readonly InventoryScanner instance = new InventoryScanner();
+                Ore = new Dictionary<ItemType, List<OreDonor>>();
+                Ingots = new Dictionary<ItemType, double>();
 
-            public static InventoryScanner Initialise(IEnumerable<ItemType> ingotTypes, IEnumerable<ItemType> oreTypes)
-            {
-                // Reuse OreDonor lists as much as possible:
-                var existingOreKeyIterator = instance.Ore.GetEnumerator();
-                while (existingOreKeyIterator.MoveNext())
-                {
-                    existingOreKeyIterator.Current.Value.Clear();
-                }
                 var oreIterator = oreTypes.GetEnumerator();
                 while (oreIterator.MoveNext())
                 {
                     List<OreDonor> list;
-                    if (!instance.Ore.TryGetValue(oreIterator.Current, out list))
+                    if (!Ore.TryGetValue(oreIterator.Current, out list))
                     {
                         list = new List<OreDonor>(ALLOC_ORE_DONOR_COUNT);
-                        instance.Ore.Add(oreIterator.Current, list);
+                        Ore.Add(oreIterator.Current, list);
                     }
                 }
 
-                instance.Ingots.Clear();
                 var ingotIterator = ingotTypes.GetEnumerator();
                 while (ingotIterator.MoveNext())
                 {
-                    instance.Ingots.Add(ingotIterator.Current, 0);
+                    Ingots.Add(ingotIterator.Current, 0);
                 }
-                return instance;
+            }
+
+            public void Reset()
+            {
+                // Reuse OreDonor lists:
+                var oreIterator = Ore.GetEnumerator();
+                while (oreIterator.MoveNext())
+                {
+                    oreIterator.Current.Value.Clear();
+                }
+
+                var ingotIterator = System.Linq.Enumerable.ToList(Ingots.Keys).GetEnumerator();
+                while (ingotIterator.MoveNext())
+                {
+                    Ingots[ingotIterator.Current] = 0;
+                }
             }
 
             public IDictionary<ItemType, List<OreDonor>> Ore { get; private set; }
-            public IDictionary<ItemType, float> Ingots { get; private set; }
+            public IDictionary<ItemType, double> Ingots { get; private set; }
 
             public void Scan(IMyInventoryOwner inventoryOwner)
             {
@@ -690,9 +1108,9 @@ namespace Script.RefineryBalance.v2
                 existing.Add(new OreDonor { Inventory = inventory, ItemId = itemId });
             }
 
-            private void AddIngots(ItemType ingot, float quantity)
+            private void AddIngots(ItemType ingot, double quantity)
             {
-                float existing;
+                double existing;
                 if (!Ingots.TryGetValue(ingot, out existing)) return;
                 Ingots[ingot] = existing + quantity;
             }
@@ -703,25 +1121,58 @@ namespace Script.RefineryBalance.v2
             public IngotWorklist(IngotStockpile[] ingotStockpiles)
             {
                 this.stockpilesByIngotType = System.Linq.Enumerable.ToDictionary(ingotStockpiles, SelectIngotItemType);
-                orderedStockpiles = SortStockpiles(ingotStockpiles);
+                candidateStockpiles = new List<IngotStockpile>(ingotStockpiles);
+                UpdatePreferred();
             }
-
-            private LinkedList<IngotStockpile> orderedStockpiles;
+            
+            private double sortThreshold;
+            private int? preferredIndex;
+            private List<IngotStockpile> candidateStockpiles;
             private readonly Dictionary<ItemType, IngotStockpile> stockpilesByIngotType;
-
-            private static LinkedList<IngotStockpile> SortStockpiles(IEnumerable<IngotStockpile> stockpiles)
+            
+            private void UpdatePreferred()
             {
-                return new LinkedList<IngotStockpile>(System.Linq.Enumerable.OrderBy(stockpiles, i => i.QuotaFraction));
+                preferredIndex = null;
+                var lowest = Double.MaxValue;
+                for(var i = 0; i < candidateStockpiles.Count; i++)
+                {
+                    var qf = candidateStockpiles[i].QuotaFraction;
+                    if(qf < lowest)
+                    {
+                        sortThreshold = lowest;
+                        preferredIndex = i;
+                        lowest = qf;
+                    }
+                    else if(qf < sortThreshold)
+                    {
+                        sortThreshold = qf;
+                    }
+                }
             }
+            
+            public bool Any { get { return candidateStockpiles.Count > 0; } }
+            
+            public bool TryGetPreferred(out IngotStockpile preferred)
+            {
+                if (!preferredIndex.HasValue) UpdatePreferred();
 
-            public IngotStockpile Preferred { get { return orderedStockpiles.First.Value; } }
+                if (preferredIndex == null)
+                {
+                    preferred = null;
+                    return false;
+                }
+
+                preferred = candidateStockpiles[preferredIndex.Value];
+                return true;
+            }
 
             public void Skip()
             {
-                orderedStockpiles.RemoveFirst();
+                candidateStockpiles.RemoveAtFast(preferredIndex.Value);
+                preferredIndex = null;
             }
 
-            public void UpdateStockpileEstimates(Refinery refinery, Blueprint blueprint, float workTowardsDeadline)
+            public void UpdateStockpileEstimates(Refinery refinery, Blueprint blueprint, double workTowardsDeadline)
             {
                 for (var i = 0; i < blueprint.Outputs.Length; i++)
                 {
@@ -731,6 +1182,19 @@ namespace Script.RefineryBalance.v2
                     if (!stockpilesByIngotType.TryGetValue(output.ItemType, out stockpile)) continue;
 
                     stockpile.AssignedWork(workTowardsDeadline, refinery.GetActualIngotProductionRate(output, blueprint.Duration));
+                }
+                if(preferredIndex.HasValue)
+                {
+                    var s = candidateStockpiles[preferredIndex.Value];
+                    if(s.IsSatisfied)
+                    {
+                        candidateStockpiles.RemoveAtFast(preferredIndex.Value);
+                        preferredIndex = null;
+                    }
+                    else if(s.QuotaFraction > sortThreshold)
+                    {
+                        preferredIndex = null;
+                    }
                 }
             }
 
@@ -759,7 +1223,7 @@ namespace Script.RefineryBalance.v2
 
             private readonly IngotStockpile[] ingotStockpiles;
 
-            public void UpdateAssemblerSpeed(float totalAssemblerSpeed)
+            public void UpdateAssemblerSpeed(double totalAssemblerSpeed)
             {
                 for(var i = 0; i < ingotStockpiles.Length; i++)
                 {
@@ -772,11 +1236,11 @@ namespace Script.RefineryBalance.v2
                 return new IngotWorklist(ingotStockpiles);
             }
 
-            public void UpdateQuantities(IDictionary<ItemType, float> currentQuantities)
+            public void UpdateQuantities(IDictionary<ItemType, double> currentQuantities)
             {
                 for (var i = 0; i < ingotStockpiles.Length; i++)
                 {
-                    float quantity;
+                    double quantity;
                     currentQuantities.TryGetValue(ingotStockpiles[i].Ingot.ItemType, out quantity);
                     ingotStockpiles[i].UpdateQuantity(quantity);
                 }
@@ -799,7 +1263,7 @@ namespace Script.RefineryBalance.v2
                 }
             }
         }
-
+        
         public static class Clock
         {
             public static long RealTicks { get { return DateTime.UtcNow.Ticks; } }
@@ -808,10 +1272,16 @@ namespace Script.RefineryBalance.v2
 
         #region Requested configuration
 
-        public struct RequestedIngotConfiguration
+        public class RequestedIngotConfiguration
         {
+            public RequestedIngotConfiguration()
+            {
+                Enable = true;
+            }
+
             public float? StockpileTarget { get; set; }
             public float? StockpileLimit { get; set; }
+            public bool Enable { get; set; }
         }
 
         public class RequestedConfiguration
@@ -836,7 +1306,8 @@ namespace Script.RefineryBalance.v2
         private static readonly long HighPrecisionBailout = TimeSpan.FromMilliseconds(100).Ticks;
 
         private long lastCall;
-        private bool yielded;
+        private int yieldCount;
+        private long totalTime;
         private RefineryDriver instance;
 
         void Main(string args)
@@ -845,7 +1316,7 @@ namespace Script.RefineryBalance.v2
             var now = Clock.RealTicks;
             var ticksSinceLastCall = now - lastCall;
             // Fast bail-out when we're between operations.
-            if(!yielded && ticksSinceLastCall < HighPrecisionBailout) return;
+            if(yieldCount <= 0 && ticksSinceLastCall < HighPrecisionBailout) return;
 
             lastCall = now;
 
@@ -857,15 +1328,28 @@ namespace Script.RefineryBalance.v2
                 instance = new RefineryDriver(args);
             }
 
-            yielded = instance.Run(now, GridTerminalSystem);
+            var yielded = instance.Run(now, GridTerminalSystem);
 
-            Debug.Write("Runtime this update: {0:0.#}ms", (Clock.RealTicks - now) / TimeSpan.TicksPerMillisecond);
+            var thisUpdate = Clock.RealTicks - now;
+            Debug.Write("Runtime this update: {0:0.#}ms", thisUpdate / TimeSpan.TicksPerMillisecond);
+
+            if(yielded)
+            {
+                yieldCount++;
+                totalTime += thisUpdate;
+            }
+            else if(yieldCount > 0)
+            {
+                Debug.Write("Completed in {0:0.#}ms over {1} updates.", totalTime / TimeSpan.TicksPerMillisecond, yieldCount);
+                yieldCount = 0;
+                totalTime = 0;
+            }
         }
         
         // Lambdas
 
         public static ItemType SelectOreType(Blueprint blueprint) { return blueprint.Input.ItemType; }
-        public static float SelectOreConsumedPerSecond(Blueprint blueprint) { return (float)(blueprint.Input.Quantity / blueprint.Duration); }
+        public static double SelectOreConsumedPerSecond(Blueprint blueprint) { return blueprint.Input.Quantity / blueprint.Duration; }
         public string SelectCustomName(IMyTerminalBlock block) { return block.CustomName; }
         public static IMyInventory SelectCargoContainerInventory(IMyCargoContainer container) { return container.GetInventory(0); }
         public static ItemType SelectIngotItemType(IngotStockpile stockpile) { return stockpile.Ingot.ItemType; }
@@ -876,15 +1360,17 @@ namespace Script.RefineryBalance.v2
         public static TKey SelectGroupKey<TKey, TElement>(System.Linq.IGrouping<TKey, TElement> group) { return group.Key; }
         public static bool IsCountMoreThanOne<T>(IEnumerable<T> set) { return System.Linq.Enumerable.Count(set) > 1; }
         public static bool IsIngotTypeEnabled(IngotType ingotType) { return ingotType.Enabled; }
-        public static IngotStockpile SelectStockpileFromIngotType(IngotType ingotType) { return new IngotStockpile(ingotType); }
+        public static TKey SelectKey<TKey, TValue>(KeyValuePair<TKey, TValue> pair) { return pair.Key; }
+        public static TValue SelectValue<TKey, TValue>(KeyValuePair<TKey, TValue> pair) { return pair.Value; }
 
-        private static bool IsBlockOperational(IMyFunctionalBlock block)
+        public static bool IsBlockOperational(IMyFunctionalBlock block)
         {
             return block.Enabled && block.IsFunctional && block.IsWorking;
         }
 
         /// <summary>
         /// Records current quantities and target quantities for a material.
+        /// Long-lived object.
         /// </summary>
         public class IngotStockpile
         {
@@ -895,27 +1381,27 @@ namespace Script.RefineryBalance.v2
                 UpdateAssemblerSpeed(1); // Default assembler speed to 'realistic'. Provided for tests; should be updated prior to use anyway.
             }
 
-            public void AssignedWork(float seconds, float productionRate)
+            public void AssignedWork(double seconds, double productionRate)
             {
                 EstimatedProduction += seconds * productionRate;
             }
 
-            public void UpdateAssemblerSpeed(float totalAssemblerSpeed)
+            public void UpdateAssemblerSpeed(double totalAssemblerSpeed)
             {
-                TargetQuantity = Ingot.StockpileTargetOverride ?? ((float)Ingot.ConsumedPerSecond * TARGET_INTERVAL_SECONDS * totalAssemblerSpeed);
+                TargetQuantity = Ingot.StockpileTargetOverride ?? (Ingot.ConsumedPerSecond * TARGET_INTERVAL_SECONDS * totalAssemblerSpeed);
 
                 shortfallUpperLimit = TargetQuantity / 2;
                 shortfallLowerLimit = TargetQuantity / 100;
             }
 
-            public void UpdateQuantity(float currentQuantity)
+            public void UpdateQuantity(double currentQuantity)
             {
                 UpdateShortfall(CurrentQuantity - currentQuantity);
                 CurrentQuantity = currentQuantity;
                 EstimatedProduction = 0;
             }
 
-            private void UpdateShortfall(float shortfall)
+            private void UpdateShortfall(double shortfall)
             {
                 if (shortfall <= 0)
                 {
@@ -937,28 +1423,28 @@ namespace Script.RefineryBalance.v2
 
             public IngotType Ingot { get; private set; }
 
-            private float shortfallUpperLimit;
-            private float shortfallLowerLimit;
+            private double shortfallUpperLimit;
+            private double shortfallLowerLimit;
             // Adjustment factor for ingot consumption rate.
-            private float lastShortfall;
+            private double lastShortfall;
 
-            public float CurrentQuantity { get; private set; }
+            public double CurrentQuantity { get; private set; }
             /// <summary>
             /// Units (kg) of ingots which we believe newly-allocated refinery work will produce
             /// before the next iteration.
             /// </summary>
-            public float EstimatedProduction { get; private set; }
+            public double EstimatedProduction { get; private set; }
             /// <summary>
             /// Maximum number of units (kg) of ingots which may be consumed by assemblers, assuming
             /// most expensive blueprint.
             /// </summary>
-            public float TargetQuantity { get; set; }
+            public double TargetQuantity { get; private set; }
 
             /// <summary>
             /// Based on newly-allocated work, the estimated number of units (kg) of ingots which
             /// will be produced before the next iteration, minus consumption.
             /// </summary>
-            public float EstimatedQuantity { get { return Math.Max(0, CurrentQuantity + EstimatedProduction - lastShortfall); } }
+            public double EstimatedQuantity { get { return Math.Max(0, CurrentQuantity + EstimatedProduction - lastShortfall); } }
             /// <summary>
             /// Estimated fraction of target quantity (kg) of ingots which should be produced before
             /// the next iteration.
@@ -968,14 +1454,9 @@ namespace Script.RefineryBalance.v2
             /// run out. If this is less than 1, it means that if all assemblers are manufacturing the
             /// most demanding blueprint then the ingots may run out.
             /// </remarks>
-            public float QuotaFraction { get { return EstimatedQuantity / TargetQuantity; } }
+            public double QuotaFraction { get { return EstimatedQuantity / TargetQuantity; } }
 
             public bool IsSatisfied { get { return Ingot.StockpileLimit.HasValue && Ingot.StockpileLimit.Value <= EstimatedQuantity; } }
-
-            /// <summary>
-            /// Used for maintaining the sorted linked list of stockpiles.
-            /// </summary>
-            public IngotStockpile Next { get; set; }
         }
 
         public static IList<float> ParseModuleBonuses(IMyTerminalBlock block)
@@ -1009,51 +1490,90 @@ namespace Script.RefineryBalance.v2
         }
         private static readonly System.Text.RegularExpressions.Regex rxModuleBonusPercent = new System.Text.RegularExpressions.Regex(@":\s*(?<p>\d+)%");
 
-        public struct RefineryState
+        public class Refinery
         {
-            public long Timestamp;
-            public float SecondsOfWork;
-        }
+            private IMyRefinery block;
+            private double refineSpeed;
+            private double materialEfficiency;
 
-        public struct Refinery
-        {
-            private readonly IMyRefinery block;
-            private readonly float refineSpeed;
-            private readonly float materialEfficiency;
-
-            public Refinery(IMyRefinery block, RefineryType type, float speedFactor)
+            private Refinery()
             {
-                this.block = block;
-                refineSpeed = (float)type.Speed;
-                materialEfficiency = (float)type.Efficiency;
+            }
+            
+            public static Refinery Get(IMyRefinery block, RefineryType type, double speedFactor)
+            {
+                var item = GetOrCreate();
+                item.block = block;
+                item.refineSpeed = type.Speed;
+                item.materialEfficiency = type.Efficiency;
+                item.BlockDefinitionString = type.BlockDefinitionName;
 
                 var moduleBonuses = ParseModuleBonuses(block);
                 if (moduleBonuses.Count > 0)
                 {
                     var speedModifier = moduleBonuses[0] - 1; // +1 Speed per 100%.
-                    refineSpeed += speedModifier;
+                    item.refineSpeed += speedModifier;
                 }
                 if (moduleBonuses.Count > 1)
                 {
                     var efficiencyModifier = moduleBonuses[1];
-                    materialEfficiency *= efficiencyModifier;
+                    item.materialEfficiency *= efficiencyModifier;
                 }
-                refineSpeed *= speedFactor;
+                item.refineSpeed *= speedFactor;
+                return item;
             }
 
-            public string Type { get { return block.BlockDefinition.ToString(); } }
-            public float OreConsumptionRate { get { return refineSpeed; } }
+            public string BlockDefinitionString { get; private set; }
+            public double OreConsumptionRate { get { return refineSpeed; } }
             public IMyInventory GetOreInventory() { return block.GetInventory(0); }
-            public bool IsValid { get { return IsBlockOperational(block); } }
+            public bool IsValid { get { return block != null && IsBlockOperational(block); } }
 
-            public float TheoreticalIngotProductionRate { get { return refineSpeed * materialEfficiency; } }
+            public double TheoreticalIngotProductionRate { get { return refineSpeed * materialEfficiency; } }
 
-            public float GetActualIngotProductionRate(ItemAndQuantity ingotTypeFromBlueprint, double blueprintDuration)
+            public double GetActualIngotProductionRate(ItemAndQuantity ingotTypeFromBlueprint, double blueprintDuration)
             {
                 // ASSUMPTION: Blueprints are defined such that each output type's quantity should not exceed 1.
 
                 var actualOutputQuantity = Math.Min(ingotTypeFromBlueprint.Quantity * materialEfficiency, 1);
-                return (float)(actualOutputQuantity / blueprintDuration) * refineSpeed;
+                return (actualOutputQuantity / blueprintDuration) * refineSpeed;
+            }
+            
+            /// <summary>
+            /// Calculate how long the specified refinery will take to run dry, taking into account
+            /// refinery speed and ore type.
+            /// </summary>
+            public double GetSecondsToClear(OreTypes oreTypes)
+            {
+                var items = GetOreInventory().GetItems();
+                double time = 0;
+                for (var i = 0; i < items.Count; i++)
+                {
+                    time += oreTypes.GetSecondsToClear(items[i]);
+                }
+                return time / OreConsumptionRate;
+            }
+
+            
+            private static readonly List<Refinery> available = new List<Refinery>(ALLOC_REFINERY_COUNT);
+            private static readonly List<Refinery> pool = new List<Refinery>(ALLOC_REFINERY_COUNT);
+
+            public static void ReleaseAll()
+            {
+                available.Clear();
+                available.AddRange(pool);
+            }
+
+            private static Refinery GetOrCreate()
+            {
+                if (available.Count == 0)
+                {
+                    var item = new Refinery();
+                    pool.Add(item);
+                    return item;    
+                }
+                var last = available[available.Count - 1];
+                available.RemoveAt(available.Count - 1);
+                return last;
             }
         }
 
@@ -1083,8 +1603,8 @@ namespace Script.RefineryBalance.v2
             public double ProductionNormalisationFactor { get; set; }
 
             public bool Enabled { get; set; }
-            public float? StockpileTargetOverride { get; set; }
-            public float? StockpileLimit { get; set; }
+            public double? StockpileTargetOverride { get; set; }
+            public double? StockpileLimit { get; set; }
         }
 
         public struct Blueprint
@@ -1146,7 +1666,7 @@ namespace Script.RefineryBalance.v2
             }
         }
 
-        public class OreDonorsIterator
+        public struct OreDonorsIterator
         {
             private readonly List<OreDonor> donors;
             private int current;
@@ -1180,7 +1700,7 @@ namespace Script.RefineryBalance.v2
 
             public IMyInventoryItem GetItem() { return Inventory.GetItemByID(ItemId); }
 
-            public bool TransferTo(IMyInventory target, float amount)
+            public bool TransferTo(IMyInventory target, double amount)
             {
                 var index = Inventory.GetItems().IndexOf(GetItem());
                 return Inventory.TransferItemTo(target, index, null, true, (VRage.MyFixedPoint)amount);
@@ -1201,6 +1721,11 @@ namespace Script.RefineryBalance.v2
                 Speed = 1;
                 SupportedBlueprints = new HashSet<string>();
             }
+
+            public bool Supports(Blueprint bp)
+            {
+                return SupportedBlueprints.Contains(bp.Name);
+            }
         }
 
         #region 'Bundle' structures containing indexed game info about various things
@@ -1209,8 +1734,9 @@ namespace Script.RefineryBalance.v2
         {
             private readonly IDictionary<ItemType, List<Blueprint>> blueprintsByOutputType;
 
-            public Blueprints(IList<Blueprint> blueprints)
+            public Blueprints(IList<Blueprint> blueprints) : this()
             {
+                All = blueprints;
                 blueprintsByOutputType = new Dictionary<ItemType, List<Blueprint>>();
                 var iterator = blueprints.GetEnumerator();
                 while (iterator.MoveNext())
@@ -1231,6 +1757,8 @@ namespace Script.RefineryBalance.v2
                 }
             }
 
+            public IEnumerable<Blueprint> All { get; private set; }
+
             public double GetOutputPerSecondForDefaultBlueprint(ItemType singleOutput)
             {
                 List<Blueprint> blueprints;
@@ -1241,8 +1769,9 @@ namespace Script.RefineryBalance.v2
                 var iterator = blueprints.GetEnumerator();
                 while (iterator.MoveNext())
                 {
+                    var hasMultiOutput = iterator.Current.Outputs.Length > 1;
                     // Once we have a single-output blueprint, ignore all subsequent multi-output blueprints.
-                    if (ignoreMultiOutput && iterator.Current.Outputs.Length > 0) continue;
+                    if (ignoreMultiOutput && hasMultiOutput) continue;
 
                     var quantity = QuantityProduced(iterator.Current, singleOutput);
                     if (quantity <= 0) continue; // Blueprint doesn't produce this item type.
@@ -1288,7 +1817,7 @@ namespace Script.RefineryBalance.v2
 
         public struct OreTypes
         {
-            private readonly IDictionary<ItemType, float> oreConsumedPerSecond;
+            private readonly IDictionary<ItemType, double> oreConsumedPerSecond;
             private readonly HashSet<ItemType> ores;
 
             public OreTypes(ItemType[] ores, Blueprint[] blueprints)
@@ -1300,12 +1829,12 @@ namespace Script.RefineryBalance.v2
                     System.Linq.Enumerable.Max);
             }
 
-            public float GetSecondsToClear(IMyInventoryItem item)
+            public double GetSecondsToClear(IMyInventoryItem item)
             {
                 var type = new ItemType(item.Content.TypeId.ToString(), item.Content.SubtypeId.ToString());
-                float perSecond;
+                double perSecond;
                 if (!oreConsumedPerSecond.TryGetValue(type, out perSecond)) return 0f;
-                return ((float)item.Amount) / perSecond;
+                return ((double)item.Amount) / perSecond;
             }
 
             public ICollection<ItemType> All
@@ -1323,7 +1852,12 @@ namespace Script.RefineryBalance.v2
                 this.ingotTypes = ingotTypes;
             }
 
-            public IEnumerable<ItemType> All
+            public ICollection<IngotType> All
+            {
+                get { return ingotTypes; }
+            }
+            
+            public IEnumerable<ItemType> AllItemTypes
             {
                 get { return System.Linq.Enumerable.Select(ingotTypes, SelectIngotTypeItemType); }
             }
@@ -1331,20 +1865,25 @@ namespace Script.RefineryBalance.v2
 
         public struct RefineryFactory
         {
-            private Dictionary<string, RefineryType> refineryTypesByBlockDefinitionString;
-            public RefineryFactory(IEnumerable<RefineryType> refineryTypes)
+            private readonly Dictionary<string, RefineryType> refineryTypesByBlockDefinitionString;
+            public RefineryFactory(RefineryType[] refineryTypes)
             {
                 refineryTypesByBlockDefinitionString = System.Linq.Enumerable.ToDictionary(refineryTypes, SelectBlockDefinitionString);
             }
 
-            public Refinery TryResolveRefinery(IMyRefinery block, float refinerySpeedFactor)
+            public ICollection<RefineryType> AllTypes
+            {
+                get { return refineryTypesByBlockDefinitionString.Values; }
+            }
+
+            public Refinery TryResolveRefinery(IMyRefinery block, double refinerySpeedFactor)
             {
                 RefineryType type;
                 if (refineryTypesByBlockDefinitionString.TryGetValue(block.BlockDefinition.ToString(), out type))
                 {
-                    return new Refinery(block, type, refinerySpeedFactor);
+                    return Refinery.Get(block, type, refinerySpeedFactor);
                 }
-                return default(Refinery);
+                return null;
             }
         }
 
@@ -1402,7 +1941,6 @@ namespace Script.RefineryBalance.v2
 
         private const int ALLOC_REFINERY_COUNT = 20;
         private const int ALLOC_ORE_TYPE_COUNT = 10;
-        private const int ALLOC_INGOT_TYPE_COUNT = 10;
         private const int ALLOC_INVENTORY_OWNER_COUNT = 10;
         private const int ALLOC_ORE_DONOR_COUNT = 10;
 
@@ -1437,42 +1975,30 @@ namespace Script.RefineryBalance.v2
             new Blueprint("StoneOreToIngot", 1, new ItemAndQuantity("Ore/Stone", 0.25), new ItemAndQuantity("Ingot/Stone", 0.0018))
         };
         public static RefineryType[] REFINERY_TYPES = new[] {
-            new RefineryType("LargeRefinery")
-            {
+            new RefineryType("LargeRefinery") {
                 SupportedBlueprints = { "StoneOreToIngot", "IronOreToIngot", "ScrapToIronIngot", "NickelOreToIngot", "CobaltOreToIngot",
                     "MagnesiumOreToIngot", "SiliconOreToIngot", "SilverOreToIngot", "GoldOreToIngot", "PlatinumOreToIngot", "UraniumOreToIngot" },
-                Efficiency = 0.8,
-                Speed = 1.3
+                Efficiency = 0.8, Speed = 1.3
             },
-            new RefineryType("Blast Furnace")
-            {
+            new RefineryType("Blast Furnace") {
                 SupportedBlueprints = { "IronOreToIngot", "ScrapToIronIngot", "NickelOreToIngot", "CobaltOreToIngot" },
-                Efficiency = 0.9,
-                Speed = 1.6
+                Efficiency = 0.9, Speed = 1.6
             },
-            new RefineryType("Big Arc Furnace")
-            {
+            new RefineryType("Big Arc Furnace") {
                 SupportedBlueprints = { "IronOreToIngot", "ScrapToIronIngot", "NickelOreToIngot", "CobaltOreToIngot" },
-                Efficiency = 0.9,
-                Speed = 16.8
+                Efficiency = 0.9, Speed = 16.8
             },
-            new RefineryType("BigPreciousFurnace")
-            {
+            new RefineryType("BigPreciousFurnace") {
                 SupportedBlueprints = { "PlatinumOreToIngot", "SilverOreToIngot", "GoldOreToIngot" },
-                Efficiency = 0.9,
-                Speed = 16.1
+                Efficiency = 0.9, Speed = 16.1
             },
-            new RefineryType("BigSolidsFurnace")
-            {
+            new RefineryType("BigSolidsFurnace") {
                 SupportedBlueprints = { "StoneOreToIngot", "MagnesiumOreToIngot", "SiliconOreToIngot" },
-                Efficiency = 0.8,
-                Speed = 16.2
+                Efficiency = 0.8, Speed = 16.2
             },
-            new RefineryType("BigGasCentrifugalRefinery")
-            {
+            new RefineryType("BigGasCentrifugalRefinery") {
                 SupportedBlueprints = { "UraniumOreToIngot" },
-                Efficiency = 0.95,
-                Speed = 16
+                Efficiency = 0.95, Speed = 16
             }
         };
 

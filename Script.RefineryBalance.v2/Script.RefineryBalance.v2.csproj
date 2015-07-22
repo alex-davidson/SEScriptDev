@@ -63,11 +63,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="RefineryWorklistTests.cs" />
+    <Compile Include="ConfigurationParserTests.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ScriptBase.cs" />
     <Compile Include="TestHelpers.cs" />
-    <Compile Include="Tests.cs" />
+    <Compile Include="IngotWorklistTests.cs" />
     <Compile Include="IngotWorklistPrioritisationTests.cs" />
   </ItemGroup>
   <ItemGroup>
