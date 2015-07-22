@@ -68,10 +68,17 @@ namespace Script.RefineryBalance.v2
 
                 var deadline = start + DEADLINE_INTERVAL_TICKS;
 
-                while (Clock.RealTicks < deadline)
+                do
                 {
-                    if(!state.Current.Run(state, gts)) return false;
+                    if (!state.Current.Run(state, gts))
+                    {
+                        state.Current.ReleaseResources();
+                        return false;
+                    }
                 }
+                while (Clock.RealTicks < deadline);
+
+                state.Current.ReleaseResources();
                 return true;
             }
 
@@ -86,7 +93,7 @@ namespace Script.RefineryBalance.v2
                     Blueprints = new Blueprints(BLUEPRINTS),
                     RefineryFactory = new RefineryFactory(REFINERY_TYPES)
                 };
-                state.Current = new DetectRefinerySpeedTask(state);
+                state.Current = DetectRefinerySpeedTask.Initialise(state);
                 
                 var ores = System.Linq.Enumerable.ToArray(
                     System.Linq.Enumerable.Distinct(
@@ -104,7 +111,7 @@ namespace Script.RefineryBalance.v2
                 if (configuration.RefinerySpeedFactor.HasValue)
                 {
                     state.RefinerySpeedFactor = configuration.RefinerySpeedFactor.Value;
-                    state.Current = new WaitForDeadlineTask();
+                    state.Current = WaitForDeadlineTask.Instance;
                 }
                 state.StatusDisplayName = configuration.StatusDisplayName;
                 state.InventoryBlockNames = configuration.InventoryBlockNames;
@@ -176,38 +183,60 @@ namespace Script.RefineryBalance.v2
             /// <param name="gts"></param>
             /// <returns></returns>
             bool Run(ISystemState state, IMyGridTerminalSystem gts);
+
+            /// <summary>
+            /// Before returning control to the game, discard references to any temporary
+            /// resources which may otherwise be promoted to gen2.
+            /// </summary>
+            void ReleaseResources();
         }
 
         public class DetectRefinerySpeedTask : IScriptTask
         {
-            private readonly SystemState writableState;
-
-            public DetectRefinerySpeedTask(SystemState writableState)
+            private static readonly DetectRefinerySpeedTask instance = new DetectRefinerySpeedTask();
+            public static IScriptTask Initialise(SystemState writableState)
             {
-                this.writableState = writableState;
+                instance.writableState = writableState;
+                return instance;
             }
+
+            private SystemState writableState;
 
             public bool Run(ISystemState state, IMyGridTerminalSystem gts)
             {
                 writableState.RefinerySpeedFactor = 1; // TODO
-                state.Current = new WaitForDeadlineTask();
+                state.Current = WaitForDeadlineTask.Instance;
                 return true;
+            }
+
+            public void ReleaseResources()
+            {
             }
         }
 
         public class WaitForDeadlineTask : IScriptTask
         {
+            private WaitForDeadlineTask() { }
+            public static readonly WaitForDeadlineTask Instance = new WaitForDeadlineTask();
+
             public bool Run(ISystemState state, IMyGridTerminalSystem gts)
             {
                 if (state.NextAllocationTimestamp > Clock.GameUpdates) return false;
                 state.NextAllocationTimestamp = Clock.GameUpdates + TARGET_INTERVAL_UPDATES;
-                state.Current = new CollectBlocksTask();
+                state.Current = CollectBlocksTask.Instance;
                 return true;
+            }
+
+            public void ReleaseResources()
+            {
             }
         }
 
         public class CollectBlocksTask : IScriptTask
         {
+            private CollectBlocksTask() {}
+            public static readonly CollectBlocksTask Instance = new CollectBlocksTask();
+
             public bool Run(ISystemState state, IMyGridTerminalSystem gts)
             {
                 var refineries = GetParticipatingRefineries(state, gts);
@@ -216,11 +245,14 @@ namespace Script.RefineryBalance.v2
                 var inventoryOwners = new List<IMyTerminalBlock>();
                 gts.GetBlocksOfType<IMyInventoryOwner>(inventoryOwners);
                 
-                state.Current = new ScanContainersTask(state, refineries, System.Linq.Enumerable.Cast<IMyInventoryOwner>(inventoryOwners));
+                state.Current = ScanContainersTask.Initialise(state, refineries, System.Linq.Enumerable.Cast<IMyInventoryOwner>(inventoryOwners));
                 
                 return true;
             }
 
+            public void ReleaseResources()
+            {
+            }
 
             /// <summary>
             /// Find all refineries on-grid which are enabled and configured for script management, ie.
@@ -238,13 +270,13 @@ namespace Script.RefineryBalance.v2
                     if (block.UseConveyorSystem) continue;
 
                     var refinery = state.RefineryFactory.TryResolveRefinery(block, state.RefinerySpeedFactor);
-                    if (refinery != null)
+                    if (default(Refinery).Equals(refinery))
                     {
-                        result.Add(refinery);
+                        Debug.Write("Unrecognised refinery type: {0}", block.BlockDefinition);
                     }
                     else
                     {
-                        Debug.Write("Unrecognised refinery type: {0}", block.BlockDefinition);
+                        result.Add(refinery);
                     }
                 }
                 return result;
@@ -279,33 +311,48 @@ namespace Script.RefineryBalance.v2
             }
         }
 
+        /// <summary>
+        /// Scan all participating inventories for ore and ingots.
+        /// </summary>
         public class ScanContainersTask : IScriptTask
         {
-            private readonly IList<Refinery> refineries;
-            private IEnumerator<IMyInventoryOwner> iterator;
-            private InventoryScanner scanner;
-
-            public ScanContainersTask(ISystemState state, IList<Refinery> refineries, IEnumerable<IMyInventoryOwner> inventoryOwners)
+            private ScanContainersTask()
             {
-                this.refineries = refineries;
-                inventoryOwners = System.Linq.Enumerable.ToArray(inventoryOwners);
-                iterator = inventoryOwners.GetEnumerator();
-                scanner = new InventoryScanner(state.IngotTypes.All, state.OreTypes.All);
+                refineries = new List<Refinery>(ALLOC_REFINERY_COUNT);
+                inventoryOwners = new List<IMyInventoryOwner>(ALLOC_INVENTORY_OWNER_COUNT);
             }
+            private static readonly ScanContainersTask instance = new ScanContainersTask();
+
+            public static ScanContainersTask Initialise(ISystemState state, IList<Refinery> refineries, IEnumerable<IMyInventoryOwner> inventoryOwners)
+            {
+                instance.refineries.Clear();
+                instance.refineries.AddRange(refineries);
+
+                instance.inventoryOwners.Clear();
+                instance.inventoryOwners.AddRange(inventoryOwners);
+
+                instance.scanner = InventoryScanner.Initialise(state.IngotTypes.All, state.OreTypes.All);
+                return instance;
+            }
+
+            private readonly List<Refinery> refineries;
+            private readonly List<IMyInventoryOwner> inventoryOwners;
+            private InventoryScanner scanner;
 
             public bool Run(ISystemState state, IMyGridTerminalSystem gts)
             {
-                if(iterator.MoveNext())
+                if (inventoryOwners.Count > 0)
                 {
-                    scanner.Scan(iterator.Current);
+                    scanner.Scan(inventoryOwners[0]);
+                    inventoryOwners.RemoveAtFast(0);
                     return true;
                 }
 
                 state.Ingots.UpdateAssemblerSpeed(state.TotalAssemblerSpeed);
-                var ingotWorklist = state.Ingots.UpdateQuantities(scanner.Ingots);
+                state.Ingots.UpdateQuantities(scanner.Ingots);
 
                 LogToStatusDisplay(state, gts);
-                state.Current = new AllocateWorkTask(refineries, ingotWorklist, scanner.Ore);
+                state.Current = AllocateWorkTask.Initialise(refineries, scanner.Ore);
                 return true;
             }
 
@@ -322,27 +369,49 @@ namespace Script.RefineryBalance.v2
 
                 state.Ingots.LogToStatusDisplay(statusScreen);
             }
+
+
+            public void ReleaseResources()
+            {
+            }
         }
 
         public class AllocateWorkTask : IScriptTask
         {
-            private readonly RefineryWorklist refineries;
-            private readonly IDictionary<ItemType, List<OreDonor>> oreDonors;
-            private readonly IngotWorklist ingotWorklist;
-
-            public AllocateWorkTask(IList<Refinery> refineries, IngotWorklist ingotWorklist, IDictionary<ItemType, List<OreDonor>> oreDonors)
+            private AllocateWorkTask()
             {
-                this.refineries = new RefineryWorklist(refineries);
-                this.ingotWorklist = ingotWorklist;
-                this.oreDonors = oreDonors;
+                oreDonors = new Dictionary<ItemType, List<OreDonor>>(ALLOC_ORE_TYPE_COUNT);
             }
+            private static readonly AllocateWorkTask instance = new AllocateWorkTask();
+
+            public static AllocateWorkTask Initialise(IList<Refinery> refineries, IDictionary<ItemType, List<OreDonor>> oreDonors)
+            {
+                instance.refineries = RefineryWorklist.Initialise(refineries);
+
+                instance.oreDonors.Clear();
+                var oreDonorsIterator = oreDonors.GetEnumerator();
+                while(oreDonorsIterator.MoveNext()) instance.oreDonors.Add(oreDonorsIterator.Current.Key, oreDonorsIterator.Current.Value);
+                return instance;
+            }
+
+            private RefineryWorklist refineries;
+            private Dictionary<ItemType, List<OreDonor>> oreDonors;
+            private IngotWorklist ingotWorklist;
 
             public bool Run(ISystemState state, IMyGridTerminalSystem gts)
             {
+                if (ingotWorklist == null) ingotWorklist = state.Ingots.GetWorklist(); 
+
                 if (AllocateSingle(state)) return true;
 
-                state.Current = new WaitForDeadlineTask();
+                state.Current = WaitForDeadlineTask.Instance;
                 return false;
+            }
+
+            public void ReleaseResources()
+            {
+                // Release sorted ingot list at the end of each iteration to avoid gen2 promotion.
+                ingotWorklist = null;
             }
 
             private bool AllocateSingle(ISystemState state)
@@ -443,19 +512,18 @@ namespace Script.RefineryBalance.v2
                 var oreRate = refinery.OreConsumptionRate * (float)blueprint.Input.Quantity;
                 var oreQuantityRequired = oreRate * workRequiredSeconds;
 
-                var sources = oreDonors[blueprint.Input.ItemType];
+                var sources = new OreDonorsIterator(oreDonors[blueprint.Input.ItemType]);
 
                 var workProvidedSeconds = 0f;
                 // Iterate over available stacks until we run out or satisfy the quota.
-                for (var j = 0; j < sources.Count; j++)
+                while(sources.Next())
                 {
-                    var donor = sources[j];
+                    var donor = sources.Current;
                     var item = donor.GetItem();
                     if (item == null || item.Amount == 0)
                     {
                         // Donor stack is empty. Remove it.
-                        sources.RemoveAt(j);
-                        j--;
+                        sources.Remove();
                         continue;
                     }
                     if (!donor.Inventory.IsConnectedTo(refinery.GetOreInventory()))
@@ -479,7 +547,6 @@ namespace Script.RefineryBalance.v2
                 }
                 return workProvidedSeconds;
             }
-
         }
 
         #endregion
@@ -540,31 +607,58 @@ namespace Script.RefineryBalance.v2
 
         public class RefineryWorklist
         {
-            public RefineryWorklist(IEnumerable<Refinery> refineries)
+            private RefineryWorklist()
             {
+                refineriesBySpeed = new List<Refinery>(ALLOC_REFINERY_COUNT);
+                refineriesByEfficiency = new List<Refinery>(ALLOC_REFINERY_COUNT);
+            }
+            private static RefineryWorklist instance;
 
+            public static RefineryWorklist Initialise(IList<Refinery> refineries)
+            {
+                
+                return instance;
             }
 
-            private Refinery[] refineriesBySpeed;
-            private Refinery[] refineriesByEfficiency;
+            private List<Refinery> refineriesBySpeed;
+            private List<Refinery> refineriesByEfficiency;
         }
 
         public class InventoryScanner
         {
-            public InventoryScanner(IEnumerable<ItemType> ingotTypes, IEnumerable<ItemType> oreTypes)
+            private InventoryScanner()
             {
-                Ore = new Dictionary<ItemType, List<OreDonor>>();
-                var oreIterator = oreTypes.GetEnumerator();
-                while(oreIterator.MoveNext())
+                Ore = new Dictionary<ItemType, List<OreDonor>>(ALLOC_ORE_TYPE_COUNT);
+                Ingots = new Dictionary<ItemType, float>(ALLOC_INGOT_TYPE_COUNT);
+            }
+            private static readonly InventoryScanner instance = new InventoryScanner();
+
+            public static InventoryScanner Initialise(IEnumerable<ItemType> ingotTypes, IEnumerable<ItemType> oreTypes)
+            {
+                // Reuse OreDonor lists as much as possible:
+                var existingOreKeyIterator = instance.Ore.GetEnumerator();
+                while (existingOreKeyIterator.MoveNext())
                 {
-                    Ore.Add(oreIterator.Current, new List<OreDonor>());
+                    existingOreKeyIterator.Current.Value.Clear();
                 }
-                Ingots = new Dictionary<ItemType, float>();
+                var oreIterator = oreTypes.GetEnumerator();
+                while (oreIterator.MoveNext())
+                {
+                    List<OreDonor> list;
+                    if (!instance.Ore.TryGetValue(oreIterator.Current, out list))
+                    {
+                        list = new List<OreDonor>(ALLOC_ORE_DONOR_COUNT);
+                        instance.Ore.Add(oreIterator.Current, list);
+                    }
+                }
+
+                instance.Ingots.Clear();
                 var ingotIterator = ingotTypes.GetEnumerator();
                 while (ingotIterator.MoveNext())
                 {
-                    Ingots.Add(ingotIterator.Current, 0);
+                    instance.Ingots.Add(ingotIterator.Current, 0);
                 }
+                return instance;
             }
 
             public IDictionary<ItemType, List<OreDonor>> Ore { get; private set; }
@@ -673,7 +767,12 @@ namespace Script.RefineryBalance.v2
                 }
             }
 
-            public IngotWorklist UpdateQuantities(IDictionary<ItemType, float> currentQuantities)
+            public IngotWorklist GetWorklist()
+            {
+                return new IngotWorklist(ingotStockpiles);
+            }
+
+            public void UpdateQuantities(IDictionary<ItemType, float> currentQuantities)
             {
                 for (var i = 0; i < ingotStockpiles.Length; i++)
                 {
@@ -681,7 +780,6 @@ namespace Script.RefineryBalance.v2
                     currentQuantities.TryGetValue(ingotStockpiles[i].Ingot.ItemType, out quantity);
                     ingotStockpiles[i].UpdateQuantity(quantity);
                 }
-                return new IngotWorklist(ingotStockpiles);
             }
 
             public void LogToStatusDisplay(IMyTextPanel display)
@@ -917,7 +1015,7 @@ namespace Script.RefineryBalance.v2
             public float SecondsOfWork;
         }
 
-        public class Refinery
+        public struct Refinery
         {
             private readonly IMyRefinery block;
             private readonly float refineSpeed;
@@ -1045,6 +1143,33 @@ namespace Script.RefineryBalance.v2
             public override string ToString()
             {
                 return TypeId + "/" + SubtypeId;
+            }
+        }
+
+        public class OreDonorsIterator
+        {
+            private readonly List<OreDonor> donors;
+            private int current;
+            
+            public OreDonorsIterator(List<OreDonor> donors)
+            {
+                current = -1;
+                this.donors = donors;
+            }
+
+            public void Remove()
+            {
+                // Order doesn't matter. Just get the next one really really fast.
+                donors.RemoveAtFast(current);
+                current--;
+            }
+
+            public OreDonor Current { get { return donors[current]; } }
+
+            public bool Next()
+            {
+                current++;
+                return current < donors.Count;
             }
         }
 
@@ -1219,7 +1344,7 @@ namespace Script.RefineryBalance.v2
                 {
                     return new Refinery(block, type, refinerySpeedFactor);
                 }
-                return null;
+                return default(Refinery);
             }
         }
 
@@ -1272,6 +1397,14 @@ namespace Script.RefineryBalance.v2
 
             public static IMyTextPanel DebugPanel { get { return debugScreen; } }
         }
+
+        /****************************************** MEMORY ALLOCATION TUNING ***************************************/
+
+        private const int ALLOC_REFINERY_COUNT = 20;
+        private const int ALLOC_ORE_TYPE_COUNT = 10;
+        private const int ALLOC_INGOT_TYPE_COUNT = 10;
+        private const int ALLOC_INVENTORY_OWNER_COUNT = 10;
+        private const int ALLOC_ORE_DONOR_COUNT = 10;
 
 
         /*********************************************** GAME CONSTANTS ********************************************/
