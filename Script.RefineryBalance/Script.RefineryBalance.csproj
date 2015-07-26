@@ -52,6 +52,9 @@
     <Reference Include="VRage">
       <HintPath>..\lib\se-binaries\VRage.dll</HintPath>
     </Reference>
+    <Reference Include="VRage.Game">
+      <HintPath>..\lib\se-binaries\VRage.Game.dll</HintPath>
+    </Reference>
     <Reference Include="VRage.Library">
       <HintPath>..\lib\se-binaries\VRage.Library.dll</HintPath>
     </Reference>

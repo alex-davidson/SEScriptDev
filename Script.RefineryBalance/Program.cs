@@ -11,8 +11,8 @@ namespace Script.RefineryBalance
     public partial class Program
     {
         /*
-         * 'Lean' Refinery Driver Script v1.52
-         * Alex Davidson, 08/07/2015.
+         * 'Lean' Refinery Driver Script v1.6
+         * Alex Davidson, 26/07/2015.
          * License: Beerware. Feel free to modify and redistribute this script, and if you think it's
          *          worth it, maybe buy me a beer someday.
          * 
@@ -46,6 +46,10 @@ namespace Script.RefineryBalance
          * time since it was last called.
          * Modify TargetIntervalSeconds to make it run less (or more) often, but it may be CPU-intensive
          * in some configurations so don't lower that value too much.
+         * 
+         * Changelog, v1.6
+         * ----------------
+         *   * SE v1.092 introduces a breaking API change. The Blocks property is no longer available.
          * 
          * Changelog, v1.5x
          * ----------------
@@ -760,9 +764,11 @@ namespace Script.RefineryBalance
         /// Find all cargo containers on-grid and group them by name for efficient lookup.
         /// </summary>
         private System.Linq.ILookup<string, IMyCargoContainer> AllCargoContainersByName() 
-        { 
+        {
+            var list = new List<IMyTerminalBlock>();
+            GridTerminalSystem.GetBlocksOfType<IMyCargoContainer>(list);
             return System.Linq.Enumerable.ToLookup(
-                System.Linq.Enumerable.OfType<IMyCargoContainer>(GridTerminalSystem.Blocks),
+                System.Linq.Enumerable.OfType<IMyCargoContainer>(list),
                 SelectCustomName);
         }
 
