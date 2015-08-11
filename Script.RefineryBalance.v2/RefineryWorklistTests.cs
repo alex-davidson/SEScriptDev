@@ -15,7 +15,6 @@ namespace Script.RefineryBalance.v2
         [TestFixture]
         public class RefineryWorklistTests
         {
-            private readonly IMyRefinery mockRefinery = new Mock<IMyRefinery>().Object;
             private readonly StaticState staticState = new StaticState(new RequestedConfiguration());
          
             private IMyRefinery MockRefinery()

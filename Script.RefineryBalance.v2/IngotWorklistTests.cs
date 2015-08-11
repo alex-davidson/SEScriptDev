@@ -25,10 +25,9 @@ namespace Script.RefineryBalance.v2
                     { "Ingot/C", 8 },   // 40%
                     { "Ingot/D", 12 }   // 150%
                 });
-                var worklist = stockpiles.GetWorklist();
-
+                
                 IngotStockpile preferred;
-                Assume.That(worklist.TryGetPreferred(out preferred));
+                Assume.That(stockpiles.Worklist.TryGetPreferred(out preferred));
                 Assert.That(preferred.Ingot.ItemType, Is.EqualTo(new ItemType("Ingot/B")));
             }
 
@@ -43,12 +42,11 @@ namespace Script.RefineryBalance.v2
                     { "Ingot/A", 5 },   // 50%
                     { "Ingot/B", 10 }   // 10%
                 });
-                var worklist = stockpiles.GetWorklist();
-
-                worklist.UpdateStockpileEstimates(DefaultRefinery, DefaultBlueprintProducing("Ingot/B"), 100);
+                
+                stockpiles.Worklist.UpdateStockpileEstimates(DefaultRefinery, DefaultBlueprintProducing("Ingot/B"), 100);
 
                 IngotStockpile preferred;
-                Assert.That(worklist.TryGetPreferred(out preferred));
+                Assert.That(stockpiles.Worklist.TryGetPreferred(out preferred));
                 Assert.That(preferred.Ingot.ItemType, Is.EqualTo(new ItemType("Ingot/A")));
             }
 
@@ -63,16 +61,15 @@ namespace Script.RefineryBalance.v2
                     { "Ingot/A", 5 },   // 50%
                     { "Ingot/B", 10 }   // 10%
                 });
-                var worklist = stockpiles.GetWorklist();
-
-                worklist.UpdateStockpileEstimates(DefaultRefinery, DefaultBlueprintProducing("Ingot/B"), 100);
+                
+                stockpiles.Worklist.UpdateStockpileEstimates(DefaultRefinery, DefaultBlueprintProducing("Ingot/B"), 100);
 
                 IngotStockpile preferred;
-                Assume.That(worklist.TryGetPreferred(out preferred));
-                worklist.Skip();
-                Assume.That(worklist.TryGetPreferred(out preferred));
-                worklist.Skip();
-                Assert.That(worklist.TryGetPreferred(out preferred), Is.False);
+                Assume.That(stockpiles.Worklist.TryGetPreferred(out preferred));
+                stockpiles.Worklist.Skip();
+                Assume.That(stockpiles.Worklist.TryGetPreferred(out preferred));
+                stockpiles.Worklist.Skip();
+                Assert.That(stockpiles.Worklist.TryGetPreferred(out preferred), Is.False);
             }
         }
     }

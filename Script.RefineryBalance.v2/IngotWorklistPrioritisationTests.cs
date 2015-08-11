@@ -21,17 +21,16 @@ namespace Script.RefineryBalance.v2
                 var refinery = Refinery.Get(mockRefinery, new RefineryType("Refinery") { SupportedBlueprints = { "A" } }, 1);
 
                 stockpiles.UpdateQuantities(new TestIngotQuantities { { "Ingot/A", 50 } });
-                var worklist = stockpiles.GetWorklist();
-
+                
                 IngotStockpile preferred;
-                Assume.That(worklist.TryGetPreferred(out preferred));
+                Assume.That(stockpiles.Worklist.TryGetPreferred(out preferred));
                 Assume.That(preferred.EstimatedProduction, Is.EqualTo(0));
 
                 var initialQuotaFraction = preferred.QuotaFraction;
-                worklist.UpdateStockpileEstimates(refinery, blueprint, 5);
+                stockpiles.Worklist.UpdateStockpileEstimates(refinery, blueprint, 5);
 
                 IngotStockpile updatedPreferred;
-                Assume.That(worklist.TryGetPreferred(out updatedPreferred));
+                Assume.That(stockpiles.Worklist.TryGetPreferred(out updatedPreferred));
 
                 Assert.That(updatedPreferred.QuotaFraction, Is.GreaterThan(initialQuotaFraction));
                 Assert.That(updatedPreferred.EstimatedProduction, Is.GreaterThan(0));
@@ -45,10 +44,9 @@ namespace Script.RefineryBalance.v2
                 var refinery = Refinery.Get(mockRefinery, new RefineryType("Refinery") { SupportedBlueprints = { "A" } }, 1);
 
                 stockpiles.UpdateQuantities(new TestIngotQuantities { { "Ingot/B", 20 } });
-                var worklist = stockpiles.GetWorklist();
-
-                worklist.ScoreBlueprint(blueprint);
-                worklist.UpdateStockpileEstimates(refinery, blueprint, 5);
+                
+                stockpiles.Worklist.ScoreBlueprint(blueprint);
+                stockpiles.Worklist.UpdateStockpileEstimates(refinery, blueprint, 5);
             }
 
             [Test]
@@ -67,10 +65,9 @@ namespace Script.RefineryBalance.v2
                     { "Ingot/B", 50 },
                     { "Ingot/C", 50 }
                 });
-                var worklist = stockpiles.GetWorklist();
-
-                var abScore = worklist.ScoreBlueprint(blueprintAB);
-                var bcScore = worklist.ScoreBlueprint(blueprintBC);
+                
+                var abScore = stockpiles.Worklist.ScoreBlueprint(blueprintAB);
+                var bcScore = stockpiles.Worklist.ScoreBlueprint(blueprintBC);
 
                 Assert.That(bcScore, Is.GreaterThan(abScore));
             }
@@ -83,10 +80,9 @@ namespace Script.RefineryBalance.v2
                 var stockpiles = new IngotStockpiles(new TestIngotDefinitions { { "Ingot/A", 100 } });
 
                 stockpiles.UpdateQuantities(new TestIngotQuantities { { "Ingot/A", 50 } });
-                var worklist = stockpiles.GetWorklist();
-
-                var aLowScore = worklist.ScoreBlueprint(blueprintALow);
-                var aHighScore = worklist.ScoreBlueprint(blueprintAHigh);
+                
+                var aLowScore = stockpiles.Worklist.ScoreBlueprint(blueprintALow);
+                var aHighScore = stockpiles.Worklist.ScoreBlueprint(blueprintAHigh);
 
                 Assert.That(aHighScore, Is.GreaterThan(aLowScore));
             }
@@ -107,10 +103,9 @@ namespace Script.RefineryBalance.v2
                         { "Ingot/Gold", 27 },
                         { "Ingot/Iron", 15000 }
                     });
-                    var worklist = stockpiles.GetWorklist();
-
+                    
                     IngotStockpile preferred;
-                    Assert.That(worklist.TryGetPreferred(out preferred));
+                    Assert.That(stockpiles.Worklist.TryGetPreferred(out preferred));
                     Assert.That(preferred.Ingot.ItemType, Is.EqualTo(new ItemType("Ingot/Gold")));
                 }
 
@@ -127,10 +122,9 @@ namespace Script.RefineryBalance.v2
                         { "Ingot/Cobalt", 275 },
                         { "Ingot/Silver", 34 }
                     });
-                    var worklist = stockpiles.GetWorklist();
-
+                    
                     IngotStockpile preferred;
-                    Assert.That(worklist.TryGetPreferred(out preferred));
+                    Assert.That(stockpiles.Worklist.TryGetPreferred(out preferred));
                     Assert.That(preferred.Ingot.ItemType, Is.EqualTo(new ItemType("Ingot/Cobalt")));
                 }
 
@@ -149,10 +143,9 @@ namespace Script.RefineryBalance.v2
                         { "Ingot/Cobalt", 220 },
                         { "Ingot/Silver", 10 }
                     });
-                    var worklist = stockpiles.GetWorklist();
-
-                    var cobaltScore = worklist.ScoreBlueprint(cobalt);
-                    var silverScore = worklist.ScoreBlueprint(silver);
+                    
+                    var cobaltScore = stockpiles.Worklist.ScoreBlueprint(cobalt);
+                    var silverScore = stockpiles.Worklist.ScoreBlueprint(silver);
 
                     Assert.That(silverScore, Is.EqualTo(cobaltScore).Within(0.01).Percent);
                 }

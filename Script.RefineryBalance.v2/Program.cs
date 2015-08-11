@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
@@ -74,13 +75,11 @@ namespace Script.RefineryBalance.v2
                 {
                     if (!transitions.CurrentTask.Run(state, transitions, gts))
                     {
-                        transitions.CurrentTask.ReleaseResources();
                         return false;
                     }
                 }
                 while (Clock.RealTicks < deadline);
 
-                transitions.CurrentTask.ReleaseResources();
                 return true;
             }
 
@@ -329,12 +328,6 @@ namespace Script.RefineryBalance.v2
             /// Returns false if no more work is immediately available.
             /// </summary>
             bool Run(ISystemState state, ITransitions transitions, IMyGridTerminalSystem gts);
-
-            /// <summary>
-            /// Before returning control to the game, discard references to any temporary
-            /// resources which may otherwise be promoted to gen2.
-            /// </summary>
-            void ReleaseResources();
         }
 
         public class DetectRefinerySpeedTask : IScriptTask
@@ -344,10 +337,6 @@ namespace Script.RefineryBalance.v2
                 state.RefinerySpeedFactor = 1; // TODO
                 transitions.WaitForDeadline();
                 return true;
-            }
-
-            public void ReleaseResources()
-            {
             }
         }
 
@@ -360,10 +349,6 @@ namespace Script.RefineryBalance.v2
                 Debug.Clear();
                 transitions.CollectBlocks();
                 return true;
-            }
-
-            public void ReleaseResources()
-            {
             }
         }
 
@@ -406,10 +391,6 @@ namespace Script.RefineryBalance.v2
                     }
                     return System.Linq.Enumerable.Distinct(System.Linq.Enumerable.OfType<IMyInventoryOwner>(blocks));
                 }
-            }
-
-            public void ReleaseResources()
-            {
             }
 
             /// <summary>
@@ -525,11 +506,6 @@ namespace Script.RefineryBalance.v2
 
                 state.Ingots.LogToStatusDisplay(statusScreen);
             }
-
-
-            public void ReleaseResources()
-            {
-            }
         }
 
         public class AllocateWorkTask : IScriptTask
@@ -549,28 +525,18 @@ namespace Script.RefineryBalance.v2
             }
 
             private readonly Dictionary<ItemType, List<OreDonor>> oreDonors = new Dictionary<ItemType, List<OreDonor>>(ALLOC_ORE_TYPE_COUNT);
-            private IngotWorklist ingotWorklist;
-            private RefineryWorklist refineryWorklist;
+            private readonly RefineryWorklist refineryWorklist;
             
             public bool Run(ISystemState state, ITransitions transitions, IMyGridTerminalSystem gts)
             {
-                if (ingotWorklist == null) ingotWorklist = state.Ingots.GetWorklist();
-
-                if (AllocateSingle()) return true;
+                if (AllocateSingle(state.Ingots.Worklist)) return true;
                 
                 transitions.WaitForDeadline();
                 Refinery.ReleaseAll();
                 return false;
             }
 
-            public void ReleaseResources()
-            {
-                // Release sorted ingot list at the end of each iteration to avoid gen2 promotion.
-                ingotWorklist = null;
-                refineryWorklist.ReleaseResources();
-            }
-
-            private bool AllocateSingle()
+            private bool AllocateSingle(IngotWorklist ingotWorklist)
             {
                 IngotStockpile preferred;
                 while (ingotWorklist.TryGetPreferred(out preferred))
@@ -581,7 +547,7 @@ namespace Script.RefineryBalance.v2
                     {
                         do
                         {
-                            if (FillCurrentRefinery(refineries)) return true; // Yield as soon as we've allocated work.
+                            if (FillCurrentRefinery(ingotWorklist, refineries)) return true; // Yield as soon as we've allocated work.
                         } while (refineries.CanAllocate()); // Otherwise keep looking for a refinery which can do something.
                     }
                     ingotWorklist.Skip();
@@ -598,7 +564,7 @@ namespace Script.RefineryBalance.v2
             /// and the amount of ore in flight should be insignificant in comparison (approx. one
             /// 'IntervalOverlapSeconds'); it's not worth the hassle to calculate it.
             /// </remarks>
-            private bool FillCurrentRefinery(IRefineryIterator worklist)
+            private bool FillCurrentRefinery(IngotWorklist ingotWorklist, IRefineryIterator worklist)
             {
                 var assignedWork = false;
                 // How much work does this refinery need to keep it busy until the next iteration, with a safety margin?
@@ -732,33 +698,28 @@ namespace Script.RefineryBalance.v2
 
             public void DetectRefinerySpeed()
             {
-                CurrentTask.ReleaseResources();
                 CurrentTask = detectRefinerySpeedTask;
             }
 
             public void WaitForDeadline()
             {
-                CurrentTask.ReleaseResources();
                 CurrentTask = waitForDeadlineTask;
             }
 
             public void CollectBlocks()
             {
-                CurrentTask.ReleaseResources();
                 CurrentTask = collectBlocksTask;
             }
 
             public void ScanContainers(IEnumerable<Refinery> refineries, IEnumerable<IMyInventoryOwner> inventoryOwners)
             {
                 scanContainersTask.Initialise(refineries, inventoryOwners);
-                CurrentTask.ReleaseResources();
                 CurrentTask = scanContainersTask;
             }
 
             public void AllocateWork(IList<Refinery> refineries, IDictionary<ItemType, List<OreDonor>> oreDonors)
             {
  	            allocateWorkTask.Initialise(refineries, oreDonors);
-                CurrentTask.ReleaseResources();
                 CurrentTask = allocateWorkTask;
             }
 
@@ -864,10 +825,9 @@ namespace Script.RefineryBalance.v2
         public class RefineryWorklist
         {
             private readonly OreTypes oreTypes;
-            private readonly HashSet<Refinery> refineries = new HashSet<Refinery>();
-            
             private readonly Dictionary<KeyValuePair<ItemType, string>, Blueprint[]> blueprintsByIngotTypeAndBlockDefinition;
             private readonly Dictionary<ItemType, string[]> blockDefinitionsByIngotType;
+            private readonly Dictionary<ItemType, IRefineryIterator> iterators;
            
             public RefineryWorklist(OreTypes oreTypes, IngotTypes ingotTypes, RefineryFactory refineryFactory, Blueprints blueprints)
             {
@@ -888,52 +848,38 @@ namespace Script.RefineryBalance.v2
                         blueprintsByIngotTypeAndBlockDefinition.Add(key, matchingBps);
                         if(matchingBps.Length > 0) blocks.Add(refineryType.BlockDefinitionName);
                     }
-                    blockDefinitionsByIngotType.Add(ingotType, blocks.ToArray());
-                }
 
+                    blockDefinitionsByIngotType.Add(ingotType, blocks.ToArray());
+                    iterators[ingotType] = new RefineryIterator(this, ingotType);
+                }
             }
             
-            public void Initialise(IList<Refinery> refineries)
+            public void Initialise(IList<Refinery> allRefineries)
             {
-                this.refineries.Clear();
-                this.refineries.UnionWith(refineries);
-                refineriesByBlockDefinition = System.Linq.Enumerable.ToLookup(refineries, r => r.BlockDefinitionString);
+                var refineriesByBlockDefinition = System.Linq.Enumerable.ToLookup(allRefineries, r => r.BlockDefinitionString);
+
+                foreach (var iterator in iterators)
+                {
+                    var definitions = blockDefinitionsByIngotType[iterator.Key];
+                    if (definitions.Length == 0)
+                    {
+                        iterator.Value.Initialise(System.Linq.Enumerable.Empty<Refinery>());
+                    }
+                    else
+                    {
+                        var sortedList = System.Linq.Enumerable.OrderByDescending(
+                                System.Linq.Enumerable.SelectMany(definitions, d => refineriesByBlockDefinition[d]),
+                                r => r.TheoreticalIngotProductionRate);
+                        iterator.Value.Initialise(sortedList);
+                    }
+                }
             }
 
-            private readonly Dictionary<ItemType, IRefineryIterator> iterators;
             public bool TrySelectIngot(ItemType ingotType, out IRefineryIterator iterator)
             {
-                if (!iterators.TryGetValue(ingotType, out iterator))
-                {
-                    var definitions = blockDefinitionsByIngotType[ingotType];
-                    if (definitions.Length == 0) return false;
-
-                    InitResources();
-
-                    var sortedList = System.Linq.Enumerable.ToList(
-                            System.Linq.Enumerable.OrderByDescending(
-                                System.Linq.Enumerable.SelectMany(definitions, d => refineriesByBlockDefinition[d]),
-                                r => r.TheoreticalIngotProductionRate));
-
-                    iterator = new RefineryIterator(this, ingotType, sortedList);
-                    iterators.Add(ingotType, iterator);
-                }
+                if (!iterators.TryGetValue(ingotType, out iterator)) return false;
                 return iterator.CanAllocate();
             }
-
-            private System.Linq.ILookup<string, Refinery> refineriesByBlockDefinition;
-
-            private void InitResources()
-            {
-                refineriesByBlockDefinition = refineriesByBlockDefinition ?? System.Linq.Enumerable.ToLookup(refineries, r => r.BlockDefinitionString);
-            }
-
-            public void ReleaseResources()
-            {
-                iterators.Clear();
-                refineriesByBlockDefinition = null;
-            }
-
 
             class RefineryIterator : IRefineryIterator
             {
@@ -941,16 +887,22 @@ namespace Script.RefineryBalance.v2
                 private bool valid;
                 private readonly RefineryWorklist worklist;
                 private readonly ItemType ingotType;
-                private readonly List<Refinery> refineries;
+                private readonly List<Refinery> refineries = new List<Refinery>(ALLOC_REFINERY_COUNT);
                 private Blueprint[] candidateBlueprints;
 
-                public RefineryIterator(RefineryWorklist worklist, ItemType ingotType, List<Refinery> refineries)
+                public RefineryIterator(RefineryWorklist worklist, ItemType ingotType)
                 {
                     this.worklist = worklist;
                     this.ingotType = ingotType;
-                    this.refineries = refineries;
-                    index = 0;
+                }
+
+                public void Initialise(IEnumerable<Refinery> sortedRefineries)
+                {
+                    candidateBlueprints = null;
                     valid = false;
+                    index = 0;
+                    refineries.Clear();
+                    refineries.AddRange(sortedRefineries);
                 }
 
                 public Blueprint[] GetCandidateBlueprints()
@@ -1005,7 +957,6 @@ namespace Script.RefineryBalance.v2
                     if (PreferredWorkSeconds <= 0)
                     {
                         PreferredWorkSeconds = 0;
-                        worklist.refineries.Remove(Current);
                         Skip();
                         return true;
                     }
@@ -1029,6 +980,9 @@ namespace Script.RefineryBalance.v2
 
         public interface IRefineryIterator
         {
+            // Internal use, until class nesting is fixed.
+            void Initialise(IEnumerable<Refinery> sortedRefineries);
+
             void Skip();
             bool AssignedWork(ref double seconds);
             Refinery Current { get; }
@@ -1121,14 +1075,20 @@ namespace Script.RefineryBalance.v2
             public IngotWorklist(IngotStockpile[] ingotStockpiles)
             {
                 this.stockpilesByIngotType = System.Linq.Enumerable.ToDictionary(ingotStockpiles, SelectIngotItemType);
-                candidateStockpiles = new List<IngotStockpile>(ingotStockpiles);
+                candidateStockpiles = new List<IngotStockpile>(ingotStockpiles.Length);
+            }
+
+            public void Initialise()
+            {
+                candidateStockpiles.AddRange(stockpilesByIngotType.Values);
                 UpdatePreferred();
             }
+
+            private readonly List<IngotStockpile> candidateStockpiles;
+            private readonly Dictionary<ItemType, IngotStockpile> stockpilesByIngotType;
             
             private double sortThreshold;
             private int? preferredIndex;
-            private List<IngotStockpile> candidateStockpiles;
-            private readonly Dictionary<ItemType, IngotStockpile> stockpilesByIngotType;
             
             private void UpdatePreferred()
             {
@@ -1149,8 +1109,6 @@ namespace Script.RefineryBalance.v2
                     }
                 }
             }
-            
-            public bool Any { get { return candidateStockpiles.Count > 0; } }
             
             public bool TryGetPreferred(out IngotStockpile preferred)
             {
@@ -1219,9 +1177,11 @@ namespace Script.RefineryBalance.v2
             public IngotStockpiles(ICollection<IngotStockpile> ingotStockpiles)
             {
                 this.ingotStockpiles = System.Linq.Enumerable.ToArray(ingotStockpiles);
+                Worklist = new IngotWorklist(this.ingotStockpiles);
             }
 
             private readonly IngotStockpile[] ingotStockpiles;
+            public readonly IngotWorklist Worklist;
 
             public void UpdateAssemblerSpeed(double totalAssemblerSpeed)
             {
@@ -1230,12 +1190,7 @@ namespace Script.RefineryBalance.v2
                     ingotStockpiles[i].UpdateAssemblerSpeed(totalAssemblerSpeed);
                 }
             }
-
-            public IngotWorklist GetWorklist()
-            {
-                return new IngotWorklist(ingotStockpiles);
-            }
-
+            
             public void UpdateQuantities(IDictionary<ItemType, double> currentQuantities)
             {
                 for (var i = 0; i < ingotStockpiles.Length; i++)
@@ -1244,6 +1199,7 @@ namespace Script.RefineryBalance.v2
                     currentQuantities.TryGetValue(ingotStockpiles[i].Ingot.ItemType, out quantity);
                     ingotStockpiles[i].UpdateQuantity(quantity);
                 }
+                Worklist.Initialise();
             }
 
             public void LogToStatusDisplay(IMyTextPanel display)
