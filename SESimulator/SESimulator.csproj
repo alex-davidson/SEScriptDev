@@ -53,6 +53,7 @@
     <Compile Include="Data\Id.cs" />
     <Compile Include="Data\ItemType.cs" />
     <Compile Include="Data\LocalisableString.cs" />
+    <Compile Include="GameFilePart.cs" />
     <Compile Include="Localiser.cs" />
     <Compile Include="GameDataLoader.cs" />
     <Compile Include="Data\PhysicalItem.cs" />

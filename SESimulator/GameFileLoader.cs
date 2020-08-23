@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 
 namespace SESimulator
 {
@@ -16,12 +18,37 @@ namespace SESimulator
             this.dataRootPath = dataRootPath;
         }
 
-        public Stream OpenFile(GameFile file)
+        public IEnumerable<GameFilePart> GetGameFileParts(GameFile file)
         {
-            var name = Path.ChangeExtension(file.ToString(), ".sbc");
-            var path = Path.Combine(dataRootPath, name);
-            if (!File.Exists(path)) throw new FileNotFoundException(String.Format("The game data file '{0}' was not found in the current data directory at '{1}'", name, dataRootPath));
-            return File.OpenRead(path);
+            var hasContent = false;
+            var path = Path.Combine(dataRootPath, file.ToString());
+            var filePath = Path.ChangeExtension(path, ".sbc");
+            if (File.Exists(filePath))
+            {
+                hasContent = true;
+                yield return new GameFilePart(file, filePath);
+            }
+            foreach (var part in ResolveGameFilePart(file, path))
+            {
+                hasContent = true;
+                yield return part;
+            }
+            if (!hasContent) throw new FileNotFoundException(String.Format("The game data file '{0}' was not found in the current data directory at '{1}'", filePath, dataRootPath));
+        }
+
+        private IEnumerable<GameFilePart> ResolveGameFilePart(GameFile file, string path)
+        {
+            if (File.Exists(path))
+            {
+                yield return new GameFilePart(file, path);
+            }
+            if (Directory.Exists(path))
+            {
+                foreach (var child in Directory.EnumerateFileSystemEntries(path).SelectMany(p => ResolveGameFilePart(file, p)))
+                {
+                    yield return child;
+                }
+            }
         }
 
         public Stream OpenLocalisationFile(CultureInfo culture)

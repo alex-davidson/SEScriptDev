@@ -52,7 +52,7 @@ namespace SESimulator
         public IEnumerable<CubeBlock> LoadBlocks()
         {
             var typeAttribute = XName.Get("type", "http://www.w3.org/2001/XMLSchema-instance");
-            var definitions = Load(GameFile.CubeBlocks).Element("CubeBlocks").Elements("Definition");
+            var definitions = Load(GameFile.CubeBlocks).Elements("CubeBlocks").Elements("Definition");
             
 
             var refineries = definitions
@@ -81,7 +81,7 @@ namespace SESimulator
         public IEnumerable<BlueprintClass> LoadBlueprintClasses()
         {
             return Load(GameFile.BlueprintClasses)
-                .Element("BlueprintClasses")
+                .Elements("BlueprintClasses")
                 .Elements("Class")
                 .Select(ReadThing<BlueprintClass>);
         }
@@ -89,7 +89,7 @@ namespace SESimulator
         public IEnumerable<Blueprint> LoadBlueprints()
         {
             return Load(GameFile.Blueprints)
-                .Element("Blueprints")
+                .Elements("Blueprints")
                 .Elements("Blueprint")
                 .Select(x =>
                 {
@@ -113,7 +113,7 @@ namespace SESimulator
         public IEnumerable<GroupEntry> LoadBlueprintClassEntries()
         {
             return Load(GameFile.BlueprintClasses)
-                .Element("BlueprintClassEntries")
+                .Elements("BlueprintClassEntries")
                 .Elements("Entry")
                 .Select(x => new GroupEntry {
                     Group = IdFromSubTypeAttribute("BlueprintClassDefinition", x, "Class"),
@@ -124,11 +124,11 @@ namespace SESimulator
         public IEnumerable<ItemType> LoadItems()
         {
             return Load(GameFile.PhysicalItems)
-                    .Element("PhysicalItems")
+                    .Elements("PhysicalItems")
                     .Elements("PhysicalItem")
                     .Select(ReadItemType<PhysicalItem>)
                 .Concat(Load(GameFile.Components)
-                    .Element("Components")
+                    .Elements("Components")
                     .Elements("Component")
                     .Select(ReadItemType<Component>));
         }
@@ -136,10 +136,16 @@ namespace SESimulator
 
         private XElement Load(GameFile file)
         {
-            using (var stream = loader.OpenFile(file))
+            var element = new XElement("Definitions");
+            foreach (var part in loader.GetGameFileParts(file))
             {
-                return XDocument.Load(stream).Element("Definitions");
+                using (var stream = part.OpenFile())
+                {
+                    var doc = XDocument.Load(stream);
+                    element.Add(doc.Element("Definitions").Elements());
+                }
             }
+            return element;
         }
 
         private static Id ReadId(XElement el)

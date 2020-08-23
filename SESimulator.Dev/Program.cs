@@ -21,12 +21,11 @@ namespace SESimulator.Dev
             if (!Directory.Exists(gameDataRoot)) throw new ArgumentNullException(String.Format("Directory does not exist: {0}", gameDataRoot));
 
             var loader = new GameDataLoader(new GameFileLoader(gameDataRoot));
-            
-            Program.Run_BlueprintGeneration(loader);
 
-            //var localiser = loader.LoadLocalisations();
-            //var gameData = loader.LoadGameData();
-            //new Program(gameData, localiser).Run_CSV();
+            var localiser = loader.LoadLocalisations();
+            var gameData = loader.LoadGameData();
+            new Program(gameData, localiser).Run_BlueprintGeneration();
+            //new Program(gameData, localiser).Run_BlueprintSpeeds();
         }
 
         private Program(GameData gameData, Localiser localiser)
@@ -35,27 +34,60 @@ namespace SESimulator.Dev
             this.localiser = localiser;
         }
 
-        private static void Run_BlueprintGeneration(GameDataLoader loader)
+        private void Run_BlueprintGeneration()
         {
-            var bps = loader.LoadBlueprints();
-            foreach (var bp in bps)
+            Console.Out.WriteLine(@"
+public static Blueprint[] BLUEPRINTS = {
+    // Default blueprints for refining ore to ingots:");
+
+            var blueprints = gameData.FindAll<Blueprint>()
+                .Where(b => b.Public)
+                .Where(b => b.Outputs.Any(i => i.ItemId.TypeId == "Ingot"));
+
+            foreach (var bp in blueprints)
             {
-                Console.Out.Write("new Blueprint(\"{0}\"", bp.Id.SubTypeId);
+                Console.Out.Write("new Blueprint(\"{0}\", {1:0.###}f", bp.Id.SubTypeId, bp.BaseProductionTimeInSeconds);
                 var input = bp.Inputs.Single();
-                FormatStack(", new ItemAndQuantity(\"{0}/{1}\", {2:0.###}f / {3:0.###}f)", input, bp.BaseProductionTimeInSeconds);
-                var firstOutput = bp.Outputs.First();
-                FormatStack(",\n    new ItemAndQuantity(\"{0}/{1}\", {2:0.###}f / {3:0.###}f)", firstOutput, bp.BaseProductionTimeInSeconds);
-                foreach(var output in bp.Outputs.Skip(1))
+                FormatStack(", new ItemAndQuantity(\"{0}/{1}\", {2:0.###}f)", input);
+                if (bp.Outputs.Any())
                 {
-                    FormatStack(", new ItemAndQuantity(\"{0}/{1}\", {2:0.###}f / {3:0.###}f)", output, bp.BaseProductionTimeInSeconds);
+                    var firstOutput = bp.Outputs.First();
+                    FormatStack(",\n    new ItemAndQuantity(\"{0}/{1}\", {2:0.###}f)", firstOutput);
+                    foreach (var output in bp.Outputs.Skip(1))
+                    {
+                        FormatStack(", new ItemAndQuantity(\"{0}/{1}\", {2:0.###}f)", output);
+                    }
                 }
                 Console.Out.WriteLine("),");
             }
+
+            Console.Out.WriteLine(@"};");
+
+            var refineries = gameData.FindAll<ProductionBlock>()
+                .Where(i => i.Public)
+                .OfType<RefineryBlock>()
+                .Select(i => new { Refinery = i, Blueprints = i.Classes.SelectMany(gameData.FindGroupedItems<Blueprint>).Distinct() })
+                .Where(i => i.Blueprints.Any());
+
+            Console.Out.WriteLine(@"
+public static RefineryType[] REFINERY_TYPES = {");
+
+            foreach (var entry in refineries)
+            {
+                Console.Out.Write("new RefineryType(\"{0}\")", entry.Refinery.Id.SubTypeId);
+                Console.Out.WriteLine(" {");
+                Console.Out.Write("    SupportedBlueprints = { ");
+                Console.Out.Write(String.Join(", ", entry.Blueprints.Select(b => String.Concat('"', b.Id.SubTypeId, '"'))));
+                Console.Out.WriteLine(" },");
+                Console.Out.WriteLine("    Efficiency = {0}, Speed = {1}", entry.Refinery.MaterialEfficiency, entry.Refinery.RefineSpeed);
+                Console.Out.WriteLine("},");
+            }
+            Console.Out.WriteLine(@"};");
         }
 
-        private static void FormatStack(string format, ItemStack stack, decimal time)
+        private static void FormatStack(string format, ItemStack stack)
         {
-            Console.Out.Write(format, stack.ItemId.TypeId, stack.ItemId.SubTypeId, stack.Amount, time);
+            Console.Out.Write(format, stack.ItemId.TypeId, stack.ItemId.SubTypeId, stack.Amount);
         }
 
         private void Run_CSV()

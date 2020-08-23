@@ -14,5 +14,7 @@ namespace SESimulator.Data
 
         public string TypeId { get; private set; }
         public string SubTypeId { get; private set; }
+
+        public override string ToString() => $"{TypeId}/{SubTypeId}";
     }
 }
