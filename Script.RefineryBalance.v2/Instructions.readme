@@ -1,0 +1,150 @@
+﻿R e a d m e: 'Lean' Refinery Driver Script v2.0
+-----------------------------------------------
+
+Alex Davidson, 23/08/2020.
+License: Beerware. Feel free to modify and redistribute this script, and if you think it's
+         worth it, maybe buy me a beer someday.
+
+PURPOSE
+
+Given expected maximum rate of consumption of ingot types, this script scans your stockpile
+and attempts to determine which type of ingot could run out first in order to prioritise
+refining of the appropriate ore types.
+
+QUICK START
+
+  1. Set 'Use Conveyor System' to OFF for all refineries.
+  2. Put this script in a programmable block on the same grid as your refineries and assemblers.
+  3. Look up the 'refinery speed' setting for your game (probably 1, 3 or 10).
+  4. In the 'Argument' box of the programmable block, enter 'configure refinery-speed ' followed
+     by your 'refinery speed' number, and click 'Run'.
+
+So if you're in a 3x game, use 'configure refinery-speed 3'.
+
+And that should be it.
+
+DEFAULT BEHAVIOUR
+
+The intent is that this script 'just works' insofar as that's possible, and should not need
+much (if any) configuration in the majority of cases.
+
+  * Assembler and refinery speed is assumed to be '1x' (realistic).
+  * The entire grid will be searched for containers, refineries and assemblers.
+  * All base-game ingot types except for Uranium and Hydrogen/Oxygen are enabled.
+
+Assembler speed is not a particularly important detail and can usually be ignored. It affects
+default stockpile targets.
+
+Uranium is disabled by default because I personally tend to use dedicated refineries and
+storage for it. You can enable it with 'configure enable Uranium'.
+
+Note that Hydrogen/Oxygen (Ice) cannot be managed by this script, but there's very little need
+for this feature anyway since they have a specialised refinery.
+
+COMMANDS
+
+  * configure <options...>
+                Modify the script's configuration. See below for available options.
+
+  * reset
+                Revert to default configuration.
+
+  * rescan
+                Prompt the script to update its knowledge of available refineries, etc.
+                Should rarely be needed; this will happen every 60 seconds anyway by default.
+
+CONFIGURATION OPTIONS
+
+These options should be provided as part of a 'configure' command. The configuration is retained
+between game sessions. New configuration is merged with what is already there, so eg. disabling
+an ingot type won't affect settings for any other ingot type.
+
+  * assembler-speed <number>
+                Specify the world speed of assemblers. This will typically be 1, 3 or 10.
+                The default is 1. To clear a previously-specified value and reset to the default,
+                use 'assembler-speed ?'.
+
+  * refinery-speed <number>
+                Specify the world speed of refineries. This will typically be 1, 3 or 10.
+                The default is 1. To clear a previously-specified value and reset to the default,
+                use 'refinery-speed ?'.
+
+  * scan <block-name>
+                Add a block name which the script should scan for ore and ingots. By default,
+                all inventories on the grid are considered. Adding any names disables the default
+                behaviour.
+
+  * scan-all
+                Clears any existing 'scan' options and reinstates the default behaviour of
+                scanning every inventory on the grid.
+
+  * show-ore <block-name>
+                Display a summary of available ore on the specified LCD display block.
+
+  * show-ingots <block-name>
+                Display a summary of ingot stockpiles on the specified LCD display block.
+
+  * enable <ingot-rule>
+  * disable <ingot-rule>
+                Enable or disable the automatic management of an ingot type, and optionally
+                configure production targets. See below for 'ingot-rule' syntax.
+
+INGOT RULES
+
+The script uses three numbers to prioritise ingot types:
+
+  * consumption rate
+                This is derived from game files and reflects the rate at which assemblers can
+                consume this ingot type. It governs long-term production targets.
+
+  * stockpile target (configurable)
+                This governs short-term production targets by specifying the desired minimum
+                quantity of this ingot type in storage. By default it is based on consumption
+                rate.
+
+  * stockpile limit (configurable)
+                The quantity which is considered 'enough' for this ingot type. When this limit
+                is reached the script will no longer try to produce that ingot type, although
+                it may still be produced as a byproduct of refining ores which produce multiple
+                ingot types.
+
+The 'enable' and 'disable' commands take a 'rule specifier':
+
+    <ingot-type>:<target>:<limit>
+
+Examples:
+    Uranium:20:50       - Uranium, with a stockpile target of 20 and limit of 50.
+    Platinum::1000      - Platinum, with a limit of 1000, and leave the target as-is.
+    Ingot/Cobalt:?:500  - Cobalt, with a limit of 500, and reset the target to the default.
+    Gold:50             - Gold, with a target of 50, and leave the limit as-is.
+
+OPERATING ENVIRONMENT
+
+This script needs:
+  * Refineries set to NOT use the conveyor system (any that are using it will be ignored).
+    This is because otherwise the refineries will happily fill their inventories with all the
+    ore they can find instead of letting the script drip-feed them appropriately. It also
+    makes it easy to 'switch off' the script's control of a refinery since the default of
+    'conveyor on' is probably what you want in all other cases.
+  * Knowledge of the game mode's refinery and assembler speed factors.
+    We need to know how quickly refineries consume ore so that they can be fed the right
+    amount at a time. Too little and they run dry, wasting time. Too much and the 'balancing'
+    of ore processing doesn't work properly.
+
+COMMENTS
+
+This code uses doubles instead of floats to remove the requirement for the 'f' suffix from
+the configuration block in Constants.cs. Performance impact should be negligible.
+
+Performance impact of the script itself should generally be minimal. I've tried to avoid
+hogging the game loop for too long in each tick but on especially large grids it might be
+necessary to adjust some of the constants in the code.
+
+The ore and ingot display outputs are pretty bad. They're mostly for debugging.
+
+THANKS
+
+  * Keen Software House (of course) for creating this game.
+  * Mal, for huge contributions to Space Engineers scripting, including MDK-SE
+    (https://github.com/malware-dev/MDK-SE) without which this script would never have been
+    completed.
