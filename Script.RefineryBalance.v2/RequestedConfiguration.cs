@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace IngameScript
 {
-    public class RequestedConfiguration
+    public class RequestedConfiguration : IDeepCopyable<RequestedConfiguration>
     {
         public RequestedConfiguration()
         {

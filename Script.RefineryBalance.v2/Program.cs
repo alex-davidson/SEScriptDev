@@ -34,14 +34,14 @@ namespace IngameScript
             Debug.Initialise(Debug.Level.Info, Echo);
             RefineryDriver.StaticInitialise();
 
-            configuration = new ConfigurationSerialiser().Deserialise(Storage);
+            configuration = new ConfigurationReader().Deserialise(Storage);
 
             Runtime.UpdateFrequency = Constants.EXPECTED_UPDATE_MODE;
         }
 
         public void Save()
         {
-            Storage = new ConfigurationSerialiser().Serialise(configuration);
+            Storage = new ConfigurationWriter().Serialise(configuration);
         }
 
         private int yieldCount;
@@ -70,7 +70,7 @@ namespace IngameScript
                 switch (command?.ToLower())
                 {
                     case "configure":
-                        configuration = new ConfigurationSerialiser().UpdateFromCommandLine(configuration, commandLine.Items.Skip(1));
+                        configuration = new ConfigurationReader().UpdateFromCommandLine(configuration, commandLine.Items.Skip(1));
                         instance = null;
                         break;
 

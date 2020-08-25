@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using VRage.Game.ModAPI.Ingame.Utilities;
 
 namespace IngameScript
 {
-    public class ConfigurationSerialiser
+    public static class ConfigurationExtensions
     {
-        public string Serialise(RequestedConfiguration configuration)
+        public static string Serialise<T>(this IConfigurationWriter<T> writer, T configuration)
         {
-            using (var enumerator = new ConfigurationWriter().GenerateParts(configuration).GetEnumerator())
+            using (var enumerator = writer.GenerateParts(configuration).GetEnumerator())
             {
                 if (!enumerator.MoveNext()) return "";
                 var builder = new StringBuilder();
@@ -24,34 +23,40 @@ namespace IngameScript
             }
         }
 
-        private void WriteQuotedPart(StringBuilder builder, string part)
+        private static void WriteQuotedPart(StringBuilder builder, string part)
         {
             builder.Append("\"");
             builder.Append(part);
             builder.Append("\"");
         }
 
-        public RequestedConfiguration Deserialise(string serialised)
+
+        public static T Deserialise<T>(this IConfigurationReader<T> reader, string serialised) where T : new()
+        {
+            return Deserialise(reader, new T(), serialised);
+        }
+
+        public static T Deserialise<T>(this IConfigurationReader<T> reader, T defaultConfiguration, string serialised) where T : new()
         {
             var commandLine = new MyCommandLine();
             if (String.IsNullOrWhiteSpace(serialised) || !commandLine.TryParse(serialised))
             {
                 Debug.Write(Debug.Level.Info, "No stored configuration.");
-                return new RequestedConfiguration();
+                return defaultConfiguration;
             }
-            var configuration = new RequestedConfiguration();
-            if (!new ConfigurationReader().Read(configuration, commandLine.Items))
+            var configuration = new T();
+            if (!reader.Read(configuration, commandLine.Items))
             {
                 Debug.Write(Debug.Level.Error, "Unable to read the stored configuration. Resetting to defaults.");
-                return new RequestedConfiguration();
+                return defaultConfiguration;
             }
             return configuration;
         }
 
-        public RequestedConfiguration UpdateFromCommandLine(RequestedConfiguration existingConfiguration, IEnumerable<string> parts)
+        public static T UpdateFromCommandLine<T>(this IConfigurationReader<T> reader, T existingConfiguration, IEnumerable<string> parts) where T : IDeepCopyable<T>, new()
         {
             var copy = existingConfiguration.Copy();
-            if (!new ConfigurationReader().Read(copy, parts)) return existingConfiguration;
+            if (!reader.Read(copy, parts)) return existingConfiguration;
             return copy;
         }
     }

@@ -3,7 +3,7 @@ using Sandbox.ModAPI.Ingame;
 
 namespace IngameScript
 {
-    public class Constants
+    public static partial class Constants
     {
         public const UpdateFrequency EXPECTED_UPDATE_MODE = UpdateFrequency.Update100;
 

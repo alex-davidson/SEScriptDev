@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace Script.RefineryBalance.v2
 {
     [TestFixture]
-    public class ConfigurationSerialiserTests
+    public class ConfigurationWriterTests
     {
         [Test]
         public void CanRoundtrip()
@@ -29,8 +29,8 @@ namespace Script.RefineryBalance.v2
                 AssemblerSpeedFactor = 4,
             };
 
-            var serialised = new ConfigurationSerialiser().Serialise(original);
-            var roundtripped = new ConfigurationSerialiser().Deserialise(serialised);
+            var serialised = new ConfigurationWriter().Serialise(original);
+            var roundtripped = new ConfigurationReader().Deserialise(serialised);
 
             Assert.Multiple(() =>
             {

@@ -51,10 +51,10 @@
   <ItemGroup>
     <Compile Include="AssemblyFixture.cs" />
     <Compile Include="ConfigurationReaderTests.cs" />
-    <Compile Include="ConfigurationSerialiserTests.cs" />
+    <Compile Include="ConfigurationWriterTests.cs" />
     <Compile Include="IngotWorklistPrioritisationTests.cs" />
     <Compile Include="IngotWorklistTests.cs" />
-    <Compile Include="MockInventoryBase.cs" />
+    <Compile Include="MockExtensions.cs" />
     <Compile Include="Mocks.cs" />
     <Compile Include="ProgramTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -89,6 +89,7 @@
       <Version>3.17.0</Version>
     </PackageReference>
   </ItemGroup>
+  <Import Project="..\Shared.Testing\Shared.Testing.projitems" Label="Shared" />
   <PropertyGroup>
     <PrepareProjectReferencesDependsOn>$(PrepareProjectReferencesDependsOn);CopyGameFilesLocally</PrepareProjectReferencesDependsOn>
   </PropertyGroup>

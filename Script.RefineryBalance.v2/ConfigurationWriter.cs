@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
-using System.Text;
 
 namespace IngameScript
 {
-    public class ConfigurationWriter
+    public class ConfigurationWriter : IConfigurationWriter<RequestedConfiguration>
     {
         public IEnumerable<string> GenerateParts(RequestedConfiguration configuration)
         {

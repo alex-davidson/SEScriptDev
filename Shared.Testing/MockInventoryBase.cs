@@ -1,21 +1,16 @@
-﻿using IngameScript;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using VRage;
 using VRage.Game.ModAPI.Ingame;
-using VRage.ObjectBuilders;
-using VRage.Utils;
 
-namespace Script.RefineryBalance.v2
+namespace SharedTesting
 {
     public abstract class MockInventoryBase : IMyInventory
     {
-        private List<MyInventoryItem?> slots = new List<MyInventoryItem?>();
+        private readonly List<MyInventoryItem?> slots = new List<MyInventoryItem?>();
 
-        public void Add(ItemType itemType, MyFixedPoint amount) => Add(AsMyItemType(itemType), amount);
-
-        private void Add(MyItemType myItemType, MyFixedPoint amount)
+        public void Add(MyItemType myItemType, MyFixedPoint amount)
         {
             for (var i = 0; i < slots.Count; i++)
             {
@@ -29,9 +24,7 @@ namespace Script.RefineryBalance.v2
             slots.Add(new MyInventoryItem(myItemType, (uint) slots.Count, amount));
         }
 
-        public void Remove(ItemType itemType, MyFixedPoint amount) => Remove(AsMyItemType(itemType), amount);
-
-        private void Remove(MyItemType myItemType, MyFixedPoint amount)
+        public void Remove(MyItemType myItemType, MyFixedPoint amount)
         {
             for (var i = 0; i < slots.Count; i++)
             {
@@ -45,13 +38,6 @@ namespace Script.RefineryBalance.v2
             }
 
             slots.Add(new MyInventoryItem(myItemType, (uint) slots.Count, amount));
-        }
-
-        private static MyItemType AsMyItemType(ItemType itemType) =>
-            new MyItemType(new MyObjectBuilderType(typeof(Dummy)), MyStringHash.GetOrCompute(itemType.ToString()));
-
-        class Dummy
-        {
         }
 
         public abstract IMyEntity Owner { get; }

@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>c1a242ac-8e40-405a-8ff8-93296c80e36f</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Shared.Core</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)AggregateStatisticsTracker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)BlockDetailsParser.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Clock.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Constants.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Debug.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Extensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)IAccumulator.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Unit.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GroupedStatisticsTracker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)IConfigurationReader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)IConfigurationWriter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)IDeepCopyable.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SupportUtil.cs" />
+  </ItemGroup>
+</Project>

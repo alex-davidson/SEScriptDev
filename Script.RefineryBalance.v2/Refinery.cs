@@ -24,7 +24,7 @@ namespace IngameScript
             item.materialEfficiency = type.Efficiency;
             item.BlockDefinitionString = type.BlockDefinitionName;
 
-            var moduleBonuses = SupportUtil.ParseModuleBonuses(block);
+            var moduleBonuses = SupportUtil.ParseModuleBonuses(block.DetailedInfo);
             if (moduleBonuses.Count > 0)
             {
                 var speedModifier = moduleBonuses[0] - 1; // +1 Speed per 100%.

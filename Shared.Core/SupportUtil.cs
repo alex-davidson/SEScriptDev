@@ -1,17 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using Sandbox.ModAPI.Ingame;
+﻿using System.Collections.Generic;
 
 namespace IngameScript
 {
     public static class SupportUtil
     {
-        public static IList<float> ParseModuleBonuses(IMyTerminalBlock block)
+        public static IList<float> ParseModuleBonuses(string detailedInfo)
         {
             var percentages = new List<float>();
-            if (string.IsNullOrEmpty(block.DetailedInfo)) return percentages;
+            if (string.IsNullOrEmpty(detailedInfo)) return percentages;
 
-            var lines = block.DetailedInfo.Split('\n');
+            var lines = detailedInfo.Split('\n');
             // A blank line separates block info from module bonuses.
             var foundBlankLine = false;
             for (var i = 0; i < lines.Length; i++)

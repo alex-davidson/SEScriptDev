@@ -76,7 +76,7 @@ namespace IngameScript
                 if (!assembler.UseConveyorSystem) continue;
 
                 totalSpeed += assemblerSpeed;
-                var moduleBonuses = SupportUtil.ParseModuleBonuses(assembler);
+                var moduleBonuses = SupportUtil.ParseModuleBonuses(assembler.DetailedInfo);
                 if (moduleBonuses.Count > 0)
                 {
                     var speedModifier = moduleBonuses[0] - 1; // +1 Speed per 100%.
