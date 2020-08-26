@@ -12,3 +12,7 @@ Visual Studio 2010
 _NCrunch_*
 lib/se-binaries/
 data/
+*/MDK/MDK.paths.props
+*/MDK/whitelist.cache
+*_Backup_*.zip
+*.DotSettings
