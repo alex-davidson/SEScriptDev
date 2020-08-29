@@ -44,24 +44,53 @@ namespace IngameScript
             }
         }
 
-        public void UpdateOreDisplay(Dictionary<ItemType, List<OreDonor>> ore, OreTypes oreTypes)
+        private readonly StringBuilder local_UpdateOreDisplay_builder = new StringBuilder(1000);
+        public void UpdateOreDisplay(Dictionary<ItemType, List<OreDonor>> ore, OreTypes oreTypes, List<Refinery> refineries)
         {
             if (oreStatusScreen == null) return;
 
             // Clear previous state.
-            oreStatusScreen.WriteText(string.Format("Ore stockpiles  {0:dd MMM HH:mm}\n", DateTime.Now));
+            local_UpdateOreDisplay_builder.Clear();
+            
+            local_UpdateOreDisplay_builder.AppendFormat("Ore stockpiles  {0:dd MMM HH:mm}\n", DateTime.Now);
+
+            var totalConsumeSpeed = 0.0;
+            var totalProduceSpeed = 0.0;
+            foreach (var refinery in refineries)
+            {
+                totalConsumeSpeed += refinery.OreConsumptionRate;
+                totalProduceSpeed += refinery.TheoreticalIngotProductionRate;
+            }
+            local_UpdateOreDisplay_builder.AppendFormat("Refineries: {0}  Speed: {1:0.#}  Efficiency: {2:0.#}\n", refineries.Count, totalConsumeSpeed, totalProduceSpeed / totalConsumeSpeed);
 
             foreach (var slot in ore)
             {
-                var perSecond = oreTypes.GetAmountConsumedPerSecond(slot.Key);
+                var perSecond = oreTypes.GetAmountConsumedPerSecond(slot.Key) * totalConsumeSpeed;
                 var total = slot.Value.Sum(v => v.GetAmountAvailable());
-                oreStatusScreen.WriteText(
-                    String.Format("{0}:  {1:0.##}     ({2:0.##} refined/sec)\n",
-                        slot.Key.SubtypeId,
-                        total,
-                        perSecond),
-                    true);
+
+                local_UpdateOreDisplay_builder.AppendFormat("{0}:  {1:0.#} ({2:0.#}/s)", slot.Key.SubtypeId, total, perSecond);
+
+                var blueprint = oreTypes.GetBlueprint(slot.Key);
+                if (blueprint != null)
+                {
+                    local_UpdateOreDisplay_builder.AppendFormat(" -> ");
+                    if (blueprint.Value.Outputs.Length == 1)
+                    {
+                        var output = blueprint.Value.Outputs[0];
+                        local_UpdateOreDisplay_builder.AppendFormat("{0:0.#}/s", output.Quantity * totalProduceSpeed / blueprint.Value.Duration);
+                    }
+                    else
+                    {
+                        foreach (var output in blueprint.Value.Outputs)
+                        {
+                            local_UpdateOreDisplay_builder.AppendFormat(" {0}: {1:0.#}/s ", output.ItemType.SubtypeId.Substring(0, 2), output.Quantity * totalProduceSpeed / blueprint.Value.Duration);
+                        }
+                    }
+                }
+
+                local_UpdateOreDisplay_builder.Append("\n");
             }
+            oreStatusScreen.WriteText(local_UpdateOreDisplay_builder.ToString());
         }
     }
 }

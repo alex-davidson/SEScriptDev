@@ -59,8 +59,6 @@ namespace IngameScript
             // Default blueprints for refining ore to ingots:
             new Blueprint("StoneOreToIngot", 10f, new ItemAndQuantity("Ore/Stone", 1000f),
                 new ItemAndQuantity("Ingot/Stone", 14f), new ItemAndQuantity("Ingot/Iron", 30f), new ItemAndQuantity("Ingot/Nickel", 2.4f), new ItemAndQuantity("Ingot/Silicon", 4f)),
-            new Blueprint("StoneOreToIngotBasic", 1f, new ItemAndQuantity("Ore/Stone", 100f),
-                new ItemAndQuantity("Ingot/Stone", 1.4f), new ItemAndQuantity("Ingot/Iron", 3f), new ItemAndQuantity("Ingot/Nickel", 0.24f), new ItemAndQuantity("Ingot/Silicon", 0.4f)),
             new Blueprint("IronOreToIngot", 0.05f, new ItemAndQuantity("Ore/Iron", 1f),
                 new ItemAndQuantity("Ingot/Iron", 0.7f)),
             new Blueprint("NickelOreToIngot", 0.66f, new ItemAndQuantity("Ore/Nickel", 1f),

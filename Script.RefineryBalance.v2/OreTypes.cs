@@ -7,15 +7,13 @@ namespace IngameScript
 {
     public struct OreTypes
     {
-        private readonly IDictionary<ItemType, double> oreConsumedPerSecond;
+        private readonly IDictionary<ItemType, Blueprint> entries;
         public readonly ICollection<ItemType> All;
 
         public OreTypes(IEnumerable<ItemType> ores, IEnumerable<Blueprint> blueprints)
         {
             All = new HashSet<ItemType>(ores);
-            oreConsumedPerSecond = blueprints
-                .GroupBy(b => b.Input.ItemType, b => b.Input.Quantity / b.Duration)
-                .ToDictionary(g => g.Key, g => g.Max());
+            entries = blueprints.ToDictionary(b => b.Input.ItemType);
         }
 
         public double GetSecondsToClear(MyInventoryItem item)
@@ -28,9 +26,16 @@ namespace IngameScript
 
         public double GetAmountConsumedPerSecond(ItemType itemType)
         {
-            double perSecond;
-            if (!oreConsumedPerSecond.TryGetValue(itemType, out perSecond)) return 0f;
-            return perSecond;
+            Blueprint blueprint;
+            if (!entries.TryGetValue(itemType, out blueprint)) return 0;
+            return blueprint.Input.Quantity / blueprint.Duration;
+        }
+
+        public Blueprint? GetBlueprint(ItemType itemType)
+        {
+            Blueprint blueprint;
+            if (!entries.TryGetValue(itemType, out blueprint)) return null;
+            return blueprint;
         }
     }
 }

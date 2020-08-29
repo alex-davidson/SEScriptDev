@@ -55,7 +55,7 @@ namespace IngameScript
             ScanResourcesIfNecessary(gts);
 
             displayRenderer.UpdateIngotDisplay(state.Ingots);
-            displayRenderer.UpdateOreDisplay(inventoryScanner.Ore, state.Static.OreTypes);
+            displayRenderer.UpdateOreDisplay(inventoryScanner.Ore, state.Static.OreTypes, refineries);
 
             yield return null;
 
