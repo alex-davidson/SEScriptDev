@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{122051CB-5324-41CE-81EC-547250F631C3}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Script.ResourceMonitor</RootNamespace>
+    <AssemblyName>Script.ResourceMonitor.UnitTests</AssemblyName>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="ConfigurationReaderTests.cs" />
+    <Compile Include="ConfigurationSerialiserTests.cs" />
+    <Compile Include="ProgramTests.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Moq">
+      <Version>4.14.5</Version>
+    </PackageReference>
+    <PackageReference Include="NUnit">
+      <Version>3.12.0</Version>
+    </PackageReference>
+    <PackageReference Include="NUnit3TestAdapter">
+      <Version>3.17.0</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Script.ResourceMonitor\Script.ResourceMonitor.csproj">
+      <Project>{7604fd66-4cee-432b-91f4-1432f64f2033}</Project>
+      <Name>Script.ResourceMonitor</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="..\Shared.Testing\Shared.Testing.projitems" Label="Shared" />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <MDKPathsProps>../Script.ResourceMonitor/MDK/MDK.paths.props</MDKPathsProps>
+  </PropertyGroup>
+  <Import Project="$(MDKPathsProps)" Condition="exists('$(MDKPathsProps)')" />
+  <ItemGroup>
+    <Analyzer Remove="$(MDKInstallPath)\Analyzers\MDKAnalyzer.dll" />
+  </ItemGroup>
+  <PropertyGroup>
+    <PrepareProjectReferencesDependsOn>$(PrepareProjectReferencesDependsOn);CopyGameFilesLocally</PrepareProjectReferencesDependsOn>
+  </PropertyGroup>
+  <Target Name="CopyGameFilesLocally" BeforeTargets="PrepareProjectReferences" Condition="'$(MDKGameBinPath)' != ''">
+    <ItemGroup>
+      <Reference Update="@(Reference)" Condition="$([System.String]::new('%(Reference.HintPath)').StartsWith('$(MDKGameBinPath)\'))">
+        <Private>True</Private>
+      </Reference>
+    </ItemGroup>
+  </Target>
+</Project>

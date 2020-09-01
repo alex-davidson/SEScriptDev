@@ -7,7 +7,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.RefineryBalance.v2",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.RefineryBalance.v2.UnitTests", "Script.RefineryBalance.v2.UnitTests\Script.RefineryBalance.v2.UnitTests.csproj", "{1DAE0091-80AF-41F4-B381-3225CDF5B4CD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.ResourceMonitor", "Script.ResourceMonitor\Script.ResourceMonitor.csproj", "{7604FD66-4CEE-432B-91F4-1432F64F2033}"
+EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared.Core", "Shared.Core\Shared.Core.shproj", "{C1A242AC-8E40-405A-8FF8-93296C80E36F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.ResourceMonitor.UnitTests", "Script.ResourceMonitor.UnitTests\Script.ResourceMonitor.UnitTests.csproj", "{122051CB-5324-41CE-81EC-547250F631C3}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared.Testing", "Shared.Testing\Shared.Testing.shproj", "{65B22E17-2EAF-425A-BCE4-3C3884F61AFB}"
 EndProject
@@ -18,8 +22,11 @@ EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		Shared.Core\Shared.Core.projitems*{120ad54b-3568-4d4c-9eed-ce346af05863}*SharedItemsImports = 4
+		Shared.Testing\Shared.Testing.projitems*{122051cb-5324-41ce-81ec-547250f631c3}*SharedItemsImports = 4
 		Shared.Testing\Shared.Testing.projitems*{1dae0091-80af-41f4-b381-3225cdf5b4cd}*SharedItemsImports = 4
 		Shared.Testing\Shared.Testing.projitems*{65b22e17-2eaf-425a-bce4-3c3884f61afb}*SharedItemsImports = 13
+		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{7604fd66-4cee-432b-91f4-1432f64f2033}*SharedItemsImports = 4
+		Shared.Core\Shared.Core.projitems*{7604fd66-4cee-432b-91f4-1432f64f2033}*SharedItemsImports = 4
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{91a5b814-20a5-49df-bde9-e299b8e1102c}*SharedItemsImports = 13
 		Shared.Core\Shared.Core.projitems*{c1a242ac-8e40-405a-8ff8-93296c80e36f}*SharedItemsImports = 13
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{fcd6f5d4-579e-4507-9b39-87528489741e}*SharedItemsImports = 4
@@ -48,6 +55,22 @@ Global
 		{1DAE0091-80AF-41F4-B381-3225CDF5B4CD}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1DAE0091-80AF-41F4-B381-3225CDF5B4CD}.Release|x64.ActiveCfg = Release|Any CPU
 		{1DAE0091-80AF-41F4-B381-3225CDF5B4CD}.Release|x64.Build.0 = Release|Any CPU
+		{7604FD66-4CEE-432B-91F4-1432F64F2033}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{7604FD66-4CEE-432B-91F4-1432F64F2033}.Debug|Any CPU.Build.0 = Debug|x64
+		{7604FD66-4CEE-432B-91F4-1432F64F2033}.Debug|x64.ActiveCfg = Debug|x64
+		{7604FD66-4CEE-432B-91F4-1432F64F2033}.Debug|x64.Build.0 = Debug|x64
+		{7604FD66-4CEE-432B-91F4-1432F64F2033}.Release|Any CPU.ActiveCfg = Debug|x64
+		{7604FD66-4CEE-432B-91F4-1432F64F2033}.Release|Any CPU.Build.0 = Debug|x64
+		{7604FD66-4CEE-432B-91F4-1432F64F2033}.Release|x64.ActiveCfg = Debug|x64
+		{7604FD66-4CEE-432B-91F4-1432F64F2033}.Release|x64.Build.0 = Debug|x64
+		{122051CB-5324-41CE-81EC-547250F631C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{122051CB-5324-41CE-81EC-547250F631C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{122051CB-5324-41CE-81EC-547250F631C3}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{122051CB-5324-41CE-81EC-547250F631C3}.Debug|x64.Build.0 = Debug|Any CPU
+		{122051CB-5324-41CE-81EC-547250F631C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{122051CB-5324-41CE-81EC-547250F631C3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{122051CB-5324-41CE-81EC-547250F631C3}.Release|x64.ActiveCfg = Release|Any CPU
+		{122051CB-5324-41CE-81EC-547250F631C3}.Release|x64.Build.0 = Release|Any CPU
 		{120AD54B-3568-4D4C-9EED-CE346AF05863}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{120AD54B-3568-4D4C-9EED-CE346AF05863}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{120AD54B-3568-4D4C-9EED-CE346AF05863}.Debug|x64.ActiveCfg = Debug|Any CPU
