@@ -93,6 +93,23 @@ namespace Script.RefineryBalance.v2
             Assert.That(aHighScore, Is.GreaterThan(aLowScore));
         }
 
+        [Test]
+        public void ZeroStockpileDoesNotCauseAllYieldingBlueprintsToBeScoredEqually()
+        {
+            var blueprintALow = new Blueprint("ALow", 1, new ItemAndQuantity("Ore/A", 10), new ItemAndQuantity("Ingot/A", 10));
+            var blueprintAHigh = new Blueprint("AHigh", 1, new ItemAndQuantity("Ore/A", 10), new ItemAndQuantity("Ingot/A", 12));
+            var stockpiles = new IngotStockpiles(new TestIngotDefinitions { { "Ingot/A", 100 } });
+            var ingotWorklist = new IngotWorklist(stockpiles);
+
+            stockpiles.UpdateQuantities(new TestIngotQuantities { { "Ingot/A", 0 } });
+            ingotWorklist.Initialise();
+
+            var aLowScore = ingotWorklist.ScoreBlueprint(blueprintALow);
+            var aHighScore = ingotWorklist.ScoreBlueprint(blueprintAHigh);
+
+            Assert.That(aHighScore, Is.GreaterThan(aLowScore));
+        }
+
         [Description("Refs a bug in v1.4 where it would prefer iron over gold even when iron ingots were plentiful. Now technically redundant since we always prioritise by demand first.")]
         public class LowYieldHighDemandBlueprint_IsPreferredOver_HighYieldLowDemandBlueprint
         {

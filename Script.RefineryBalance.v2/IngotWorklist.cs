@@ -102,7 +102,7 @@ namespace IngameScript
                 IngotStockpile stockpile;
                 if (!stockpilesByIngotType.TryGetValue(output.ItemType, out stockpile)) continue;
                 var quantityPerSecond = output.Quantity / blueprint.Duration;
-                score += quantityPerSecond / stockpile.Ingot.ProductionNormalisationFactor / stockpile.QuotaFraction;
+                score += quantityPerSecond / stockpile.Ingot.ProductionNormalisationFactor / Math.Max(stockpile.QuotaFraction, 0.001);
             }
             return score;
         }
