@@ -63,12 +63,14 @@ namespace IngameScript
             }
             local_UpdateOreDisplay_builder.AppendFormat("Refineries: {0}  Speed: {1:0.#}  Efficiency: {2:0.#}\n", refineries.Count, totalConsumeSpeed, totalProduceSpeed / totalConsumeSpeed);
 
+            var secondsRemaining = 0.0;
             foreach (var slot in ore)
             {
                 var perSecond = oreTypes.GetAmountConsumedPerSecond(slot.Key) * totalConsumeSpeed;
                 var total = slot.Value.Sum(v => v.GetAmountAvailable());
+                secondsRemaining += total / perSecond;
 
-                local_UpdateOreDisplay_builder.AppendFormat("{0}:  {1:0.#} ({2:0.#}/s)", slot.Key.SubtypeId, total, perSecond);
+                local_UpdateOreDisplay_builder.AppendFormat("  {0}:  {1:0.#} ({2:0.#}/s)", slot.Key.SubtypeId, total, perSecond);
 
                 var blueprint = oreTypes.GetBlueprint(slot.Key);
                 if (blueprint != null)
@@ -90,6 +92,7 @@ namespace IngameScript
 
                 local_UpdateOreDisplay_builder.Append("\n");
             }
+            local_UpdateOreDisplay_builder.AppendFormat("Time to clear:  {0}", TimeSpan.FromSeconds((int)secondsRemaining));
             oreStatusScreen.WriteText(local_UpdateOreDisplay_builder.ToString());
         }
     }
