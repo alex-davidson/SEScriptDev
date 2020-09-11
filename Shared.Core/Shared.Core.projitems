@@ -16,6 +16,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Debug.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IAccumulator.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Stopwatch.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Unit.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)GroupedStatisticsTracker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IConfigurationReader.cs" />
