@@ -52,7 +52,10 @@ namespace IngameScript
 
             yield return null;
 
-            ScanResourcesIfNecessary(gts);
+            foreach (var yieldPoint in ScanResourcesIfNecessary(gts))
+            {
+                yield return yieldPoint;
+            }
 
             displayRenderer.UpdateIngotDisplay(state.Ingots);
             displayRenderer.UpdateOreDisplay(inventoryScanner.Ore, state.Static.OreTypes, refineries);
@@ -114,7 +117,7 @@ namespace IngameScript
             }
         }
 
-        private void ScanResourcesIfNecessary(IMyGridTerminalSystem gts)
+        private IEnumerable<object> ScanResourcesIfNecessary(IMyGridTerminalSystem gts)
         {
             rescanResourcesCountdown--;
             if (rescanResourcesCountdown <= 0) rescanResources = true;
@@ -123,9 +126,15 @@ namespace IngameScript
             {
                 Debug.Write(Debug.Level.Debug, "Scanning container contents...");
                 inventoryScanner.Reset();
+                var i = 0;
                 foreach (var inventoryOwner in inventoryOwners)
                 {
+                    i++;
                     inventoryScanner.Scan(inventoryOwner);
+                    // Inventory scanning is probably less intensive than refinery work assignment, but we
+                    // still need to yield periodically, and the main loop is yielding to the game every
+                    // X (default 20) of our yields...
+                    if (i % 3 == 0) yield return null;
                 }
 
                 state.Ingots.UpdateQuantities(inventoryScanner.Ingots);

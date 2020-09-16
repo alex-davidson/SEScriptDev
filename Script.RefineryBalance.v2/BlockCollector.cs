@@ -18,7 +18,7 @@ namespace IngameScript
         {
             if (inventoryBlockNames.Count == 0)
             {
-                gts.GetBlocksOfType(containers, b => b.HasInventory);
+                gts.GetBlocksOfType(containers, DefaultInventoryOwnerFilter);
             }
             else
             {
@@ -27,8 +27,29 @@ namespace IngameScript
                 {
                     gts.SearchBlocksOfName(inventoryBlockNames[i], blocks);
                 }
-                containers.AddRange(blocks.OfType<IMyEntity>().Distinct());
+                containers.AddRange(blocks.OfType<IMyEntity>().Where(b => b.HasInventory).Distinct());
             }
+        }
+
+        private bool DefaultInventoryOwnerFilter(IMyEntity entity)
+        {
+            // No point scanning things with no inventory.
+            if (!entity.HasInventory) return false;
+
+            // Include the things we definitely want to scan:
+            if (entity is IMyCargoContainer) return true;       // Obviously.
+            if (entity is IMyRefinery) return true;             // Need to track ingots produced.
+            if (entity is IMyAssembler) return true;            // Need to track ingots sitting in the inlet.
+            if (entity is IMyConveyorSorter) return true;       // Probably going to be used as filters; keep an eye on them.
+
+            // Exclude things which don't contain anything we care about, and/or are likely to exist in large numbers.
+            if (entity is IMyGasTank) return false;             // Nope.
+            if (entity is IMyGasGenerator) return false;        // We don't handle ice.
+            if (entity is IMyStoreBlock) return false;          // Not even going there.
+            if (entity is IMyUserControllableGun) return false; // Unlikely to be firing ingots or ore, currently.
+
+            // Include anything left, just in case (connectors, new blocks, etc).
+            return true;
         }
 
         /// <summary>
