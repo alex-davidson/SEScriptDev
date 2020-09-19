@@ -4,10 +4,10 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{6219A884-20EA-4F5F-9810-C1DEC259DC74}</ProjectGuid>
+    <ProjectGuid>{DDD1F60E-8967-411E-8174-830EFDF15F3F}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>IngameScript</RootNamespace>
-    <AssemblyName>Script.Hephaestus.Thrusters</AssemblyName>
+    <AssemblyName>Script.Hephaestus.Drills</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
@@ -38,15 +38,14 @@
   <Import Project="MDK/MDK.options.props" />
   <Import Project="MDK/MDK.paths.props" Condition="exists('MDK/MDK.paths.props')" />
   <ItemGroup>
-    <Compile Include="ConfigurationReader.cs" />
-    <Compile Include="ConfigurationWriter.cs" />
+    <Compile Include="ClampGroup.cs" />
     <Compile Include="Constants.cs" />
-    <Compile Include="DisplayRenderer.cs" />
-    <Compile Include="EngineModule.cs" />
-    <Compile Include="EngineTier.cs" />
-    <Compile Include="EngineTierBuilder.cs" />
+    <Compile Include="DrillHead.cs" />
+    <Compile Include="DrillTower.cs" />
+    <Compile Include="DrillTowerBuilder.cs" />
+    <Compile Include="DrillTowerState.cs" />
     <Compile Include="Errors.cs" />
-    <Compile Include="FacingRotorPair.cs" />
+    <Compile Include="LightGroup.cs" />
     <Compile Include="MDK\Bootstrapper.cs" />
     <AdditionalFiles Include="MDK\MDK.options.props">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -54,17 +53,14 @@
     <AdditionalFiles Include="MDK\MDK.paths.props">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </AdditionalFiles>
+    <Compile Include="PistonGroup.cs" />
+    <Compile Include="PistonStack.cs" />
+    <Compile Include="PistonTopology.cs" />
     <Compile Include="Program.cs" />
     <AdditionalFiles Include="Instructions.readme" />
     <AdditionalFiles Include="thumb.png" />
     <AdditionalFiles Include="MDK\whitelist.cache" />
-    <Compile Include="RequestedConfiguration.cs" />
-    <Compile Include="RotationSpeed.cs" />
-    <Compile Include="RotorLimits.cs" />
     <Compile Include="StaticState.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="DESIGN.md" />
   </ItemGroup>
   <Import Project="..\Shared.Core\Shared.Core.projitems" Label="Shared" />
   <Import Project="..\Shared.Core.Ingame\Shared.Core.Ingame.projitems" Label="Shared" />

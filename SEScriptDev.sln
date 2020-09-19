@@ -23,6 +23,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.Hephaestus.Thrusters
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.Hephaestus.Thrusters.UnitTests", "Script.Hephaestus.Thrusters.UnitTests\Script.Hephaestus.Thrusters.UnitTests.csproj", "{92F4F198-53A7-479D-B7B5-B1FA0B28A26C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.Hephaestus.Drills", "Script.Hephaestus.Drills\Script.Hephaestus.Drills.csproj", "{DDD1F60E-8967-411E-8174-830EFDF15F3F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.Hephaestus.Drills.UnitTests", "Script.Hephaestus.Drills.UnitTests\Script.Hephaestus.Drills.UnitTests.csproj", "{FCCB4DC1-3D46-4A6D-9B7B-5F4BDC53F041}"
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		Shared.Core\Shared.Core.projitems*{120ad54b-3568-4d4c-9eed-ce346af05863}*SharedItemsImports = 4
@@ -36,6 +40,9 @@ Global
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{91a5b814-20a5-49df-bde9-e299b8e1102c}*SharedItemsImports = 13
 		Shared.Testing\Shared.Testing.projitems*{92f4f198-53a7-479d-b7b5-b1fa0b28a26c}*SharedItemsImports = 4
 		Shared.Core\Shared.Core.projitems*{c1a242ac-8e40-405a-8ff8-93296c80e36f}*SharedItemsImports = 13
+		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{ddd1f60e-8967-411e-8174-830efdf15f3f}*SharedItemsImports = 4
+		Shared.Core\Shared.Core.projitems*{ddd1f60e-8967-411e-8174-830efdf15f3f}*SharedItemsImports = 4
+		Shared.Testing\Shared.Testing.projitems*{fccb4dc1-3d46-4a6d-9b7b-5f4bdc53f041}*SharedItemsImports = 4
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{fcd6f5d4-579e-4507-9b39-87528489741e}*SharedItemsImports = 4
 		Shared.Core\Shared.Core.projitems*{fcd6f5d4-579e-4507-9b39-87528489741e}*SharedItemsImports = 4
 	EndGlobalSection
@@ -102,6 +109,22 @@ Global
 		{92F4F198-53A7-479D-B7B5-B1FA0B28A26C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{92F4F198-53A7-479D-B7B5-B1FA0B28A26C}.Release|x64.ActiveCfg = Release|Any CPU
 		{92F4F198-53A7-479D-B7B5-B1FA0B28A26C}.Release|x64.Build.0 = Release|Any CPU
+		{DDD1F60E-8967-411E-8174-830EFDF15F3F}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{DDD1F60E-8967-411E-8174-830EFDF15F3F}.Debug|Any CPU.Build.0 = Debug|x64
+		{DDD1F60E-8967-411E-8174-830EFDF15F3F}.Debug|x64.ActiveCfg = Debug|x64
+		{DDD1F60E-8967-411E-8174-830EFDF15F3F}.Debug|x64.Build.0 = Debug|x64
+		{DDD1F60E-8967-411E-8174-830EFDF15F3F}.Release|Any CPU.ActiveCfg = Debug|x64
+		{DDD1F60E-8967-411E-8174-830EFDF15F3F}.Release|Any CPU.Build.0 = Debug|x64
+		{DDD1F60E-8967-411E-8174-830EFDF15F3F}.Release|x64.ActiveCfg = Debug|x64
+		{DDD1F60E-8967-411E-8174-830EFDF15F3F}.Release|x64.Build.0 = Debug|x64
+		{FCCB4DC1-3D46-4A6D-9B7B-5F4BDC53F041}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FCCB4DC1-3D46-4A6D-9B7B-5F4BDC53F041}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FCCB4DC1-3D46-4A6D-9B7B-5F4BDC53F041}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FCCB4DC1-3D46-4A6D-9B7B-5F4BDC53F041}.Debug|x64.Build.0 = Debug|Any CPU
+		{FCCB4DC1-3D46-4A6D-9B7B-5F4BDC53F041}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FCCB4DC1-3D46-4A6D-9B7B-5F4BDC53F041}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FCCB4DC1-3D46-4A6D-9B7B-5F4BDC53F041}.Release|x64.ActiveCfg = Release|Any CPU
+		{FCCB4DC1-3D46-4A6D-9B7B-5F4BDC53F041}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
