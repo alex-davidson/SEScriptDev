@@ -41,5 +41,17 @@ namespace Script.Hephaestus.Thrusters.UnitTests
             var limits = new RotorLimits(limit, float.MaxValue);
             Assert.That(limits.ClampDelta(value, delta), Is.EqualTo(expected).Within(0.0001f));
         }
+
+        [TestCase(120, -60, 180)]
+        [TestCase(70, -60, 130)]
+        [TestCase(70, -130, 160)]
+        [TestCase(0, 360, 0)]
+        [TestCase(360, -1, 1)]
+        [TestCase(359.5f, 0.5f, 1)]
+        public void CalculatesSmallestDifference(float a, float b, float expected)
+        {
+            Assert.That(RotorLimits.DifferenceDegrees(a, b), Is.EqualTo(expected).Within(0.0001f));
+            Assert.That(RotorLimits.DifferenceDegrees(b, a), Is.EqualTo(expected).Within(0.0001f));
+        }
     }
 }

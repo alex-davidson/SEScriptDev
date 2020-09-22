@@ -48,7 +48,7 @@ namespace IngameScript
                 {
                     var governingDegrees = MathHelper.ToDegrees(governing.Angle);
                     var opposedDegrees = RotorLimits.OpposedAngleDegrees(MathHelper.ToDegrees(opposing.Angle));
-                    var rotorOffset = Math.Abs(governingDegrees - opposedDegrees);
+                    var rotorOffset = RotorLimits.DifferenceDegrees(governingDegrees, opposedDegrees);
                     if (rotorOffset > 1) errors.SanityChecks.Add(new Message("Rotors of module {0} are not properly synchronised: {1}.", owningModuleName, rotorOffset));
                 }
             }

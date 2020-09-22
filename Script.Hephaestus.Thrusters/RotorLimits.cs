@@ -90,6 +90,13 @@ namespace IngameScript
             return NormaliseDegrees(360 - angleDegrees);
         }
 
+        public static float DifferenceDegrees(float a, float b)
+        {
+            return Math.Min(
+                NormaliseDegrees(a - b),
+                NormaliseDegrees(b - a));
+        }
+
         private static bool IsUnbounded(float angleDegrees)
         {
             if (angleDegrees >= float.MaxValue - float.Epsilon) return true;
