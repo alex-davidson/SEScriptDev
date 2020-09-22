@@ -32,11 +32,24 @@ namespace IngameScript
                 target.AppendLine();
             }
 
+            public bool Filter(IMyTerminalBlock block)
+            {
+                IMyGasTank tank;
+                return TryGetOxygenTank(block, out tank);
+            }
+
+            private bool TryGetOxygenTank(IMyTerminalBlock block, out IMyGasTank tank)
+            {
+                tank = block as IMyGasTank;
+                if (tank == null) return false;
+                if (tank.BlockDefinition.SubtypeId.Contains("Hydrogen")) return false;
+                return true;
+            }
+
             public void Visit(IMyTerminalBlock block)
             {
-                var tank = block as IMyGasTank;
-                if (tank == null) return;
-                if (tank.BlockDefinition.SubtypeId.Contains("Hydrogen")) return;
+                IMyGasTank tank;
+                if (!TryGetOxygenTank(block, out tank)) return;
 
                 var contents = tank.Capacity * (float)tank.FilledRatio;
                 capacityByGrid.Add(tank.CubeGrid?.CustomName,

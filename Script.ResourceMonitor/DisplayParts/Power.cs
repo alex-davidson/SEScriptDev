@@ -49,6 +49,19 @@ namespace IngameScript
                     Unit.Power.FormatSI(row.ConsumedMegawatts));
             }
 
+            public bool Filter(IMyTerminalBlock block)
+            {
+                if (block is IMyBatteryBlock) return true;
+                if (block is IMyPowerProducer) return true;
+
+                if (blockDetailsParser.Parse(block.DetailedInfo))
+                {
+                    var consumedValue = blockDetailsParser.Get("Required Input") ?? blockDetailsParser.Get("Current Input");
+                    if (consumedValue != null) return true;
+                }
+                return false;
+            }
+
             public void Visit(IMyTerminalBlock block)
             {
                 var sample = new Distribution();

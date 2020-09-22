@@ -31,6 +31,11 @@ namespace IngameScript
                 }
             }
 
+            public bool Filter(IMyTerminalBlock block)
+            {
+                return block is IMyBatteryBlock;
+            }
+
             public void Visit(IMyTerminalBlock block)
             {
                 var battery = block as IMyBatteryBlock;

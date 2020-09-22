@@ -18,6 +18,30 @@ namespace IngameScript
             this.parts = parts;
         }
 
+        public static IBlockFilter GetBlockFilter(IEnumerable<DisplayRenderer> renderers) => new BlockFilter(renderers);
+
+        class BlockFilter : IBlockFilter
+        {
+            private readonly IEnumerable<DisplayRenderer> renderers;
+
+            public BlockFilter(IEnumerable<DisplayRenderer> renderers)
+            {
+                this.renderers = renderers;
+            }
+
+            public bool Filter(IMyTerminalBlock block)
+            {
+                foreach (var renderer in renderers)
+                {
+                    foreach (var part in renderer.parts)
+                    {
+                        if (part.Filter(block)) return true;
+                    }
+                }
+                return false;
+            }
+        }
+
         public IEnumerable<IDisplayCollector> BeginDraw()
         {
             foreach (var part in parts) part.Clear();
@@ -48,7 +72,12 @@ namespace IngameScript
         }
     }
 
-    public interface IDisplayCollector
+    public interface IBlockFilter
+    {
+        bool Filter(IMyTerminalBlock block);
+    }
+
+    public interface IDisplayCollector : IBlockFilter
     {
         void Visit(IMyTerminalBlock block);
     }

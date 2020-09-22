@@ -10,13 +10,13 @@ namespace IngameScript
         public ResourceMonitorDriver(RequestedConfiguration configuration)
         {
             this.configuration = configuration;
-            blockFilter = new BlockFilterFactory().CreateFilter(configuration.BlockRules);
+            blockRuleFilter = new BlockFilterFactory().CreateRuleFilter(configuration.BlockRules);
         }
 
         private readonly List<DisplayRenderer> displays = new List<DisplayRenderer>(Constants.ALLOC_DISPLAY_COUNT);
         private readonly List<IMyTerminalBlock> scanBlocks = new List<IMyTerminalBlock>(Constants.ALLOC_SCAN_BLOCK_COUNT);
         private readonly RequestedConfiguration configuration;
-        private readonly Func<IMyTerminalBlock, bool> blockFilter;
+        private readonly BlockFilterFactory.BlockRuleFilter blockRuleFilter;
 
         public static void StaticInitialise()
         {
@@ -34,12 +34,16 @@ namespace IngameScript
             Debug.Write(Debug.Level.Debug, "Begin: {0}", DateTime.Now);
 
             // Collect blocks:
-            ScanBlocksIfNecessary(gts);
+            foreach (var yieldPoint in ScanBlocksIfNecessary(gts))
+            {
+                yield return yieldPoint;
+            }
             Debug.Write(Debug.Level.Info, "Using {0} display groups", displays.Count);
             Debug.Write(Debug.Level.Info, "Scanning {0} blocks", scanBlocks.Count);
 
             yield return null;
 
+            var i = 0;
             foreach (var display in displays)
             {
                 var collectors = display.BeginDraw();
@@ -47,10 +51,13 @@ namespace IngameScript
                 {
                     foreach (var block in scanBlocks)
                     {
+                        i++;
                         collector.Visit(block);
+                        // Inventory scanning is probably not very intensive, but we still need to yield
+                        // periodically, and the main loop is yielding to the game every X (default 20)
+                        // of our yields...
+                        if (i % 3 == 0) yield return null;
                     }
-                    // One display 'part' per action.
-                    yield return null;
                 }
                 display.EndDraw();
             }
@@ -58,7 +65,7 @@ namespace IngameScript
             Debug.Write(Debug.Level.Debug, "End: {0}", DateTime.Now);
         }
 
-        private void ScanBlocksIfNecessary(IMyGridTerminalSystem gts)
+        private IEnumerable<object> ScanBlocksIfNecessary(IMyGridTerminalSystem gts)
         {
             if (rescanBlocks)
             {
@@ -66,7 +73,6 @@ namespace IngameScript
                 // get stuff
                 displays.Clear();
                 scanBlocks.Clear();
-                gts.GetBlocksOfType(scanBlocks, blockFilter);
 
                 var displayBlocks = new List<IMyTextPanel>(10);
                 var displayRendererFactory = new DisplayRendererFactory();
@@ -86,6 +92,27 @@ namespace IngameScript
                     displays.Add(displayRendererFactory.Create(displayBlocks, displayConfiguration));
                 }
 
+                gts.GetBlocksOfType(scanBlocks, blockRuleFilter.Filter);
+
+                var i = 0;
+                var j = 0;
+                var displayFilter = DisplayRenderer.GetBlockFilter(displays);
+                while (j < scanBlocks.Count)
+                {
+                    i++;
+                    if (!displayFilter.Filter(scanBlocks[j]))
+                    {
+                        scanBlocks.RemoveAtFast(j);
+                    }
+                    else
+                    {
+                        j++;
+                    }
+                    // Block filtering is probably not very intensive, but we still need to yield
+                    // periodically, and the main loop is yielding to the game every X (default 20)
+                    // of our yields...
+                    if (i % 3 == 0) yield return null;
+                }
                 rescanBlocks = false;
             }
         }

@@ -38,6 +38,13 @@ namespace IngameScript
                     row.NumberOfH2O2Generators);
             }
 
+            public bool Filter(IMyTerminalBlock block)
+            {
+                if (block is IMyGasGenerator) return true;
+                if (!block.HasInventory) return false;
+                return block.AnyInventoryCanContain(MyItemType.MakeOre("Ice"));
+            }
+
             public void Visit(IMyTerminalBlock block)
             {
                 for (var i = 0; i < block.InventoryCount; i++)
