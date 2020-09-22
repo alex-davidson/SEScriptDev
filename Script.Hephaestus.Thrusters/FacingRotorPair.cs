@@ -38,11 +38,11 @@ namespace IngameScript
 
             if (!IsViable) return;
 
-            if (governing != null && opposing != null)
+            if (governing?.IsAttached == true && opposing?.IsAttached == true)
             {
-                if (governing.TopGrid?.EntityId != opposing.TopGrid?.EntityId)
+                if (governing.TopGrid != opposing.TopGrid)
                 {
-                    errors.SanityChecks.Add(new Message("Rotors of module {0} connect to different subgrids ({1} and {2}}.", owningModuleName, governing.TopGrid.CustomName, opposing.TopGrid.CustomName));
+                    errors.SanityChecks.Add(new Message("Rotors of module {0} connect to different subgrids ({1} and {2}).", owningModuleName, governing.TopGrid.CustomName, opposing.TopGrid.CustomName));
                 }
                 else
                 {
