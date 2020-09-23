@@ -14,7 +14,7 @@ namespace IngameScript
                 var part = GenerateDisplayPart(categoryDescriptor);
                 if (part == null)
                 {
-                    Debug.Write(Debug.Level.Warning, "Display category {0} was not recognised and will be ignored.", categoryDescriptor);
+                    Debug.Write(Debug.Level.Warning, new Message("Display category {0} was not recognised and will be ignored.", categoryDescriptor));
                     continue;
                 }
                 local_Create_partsList.Add(part);

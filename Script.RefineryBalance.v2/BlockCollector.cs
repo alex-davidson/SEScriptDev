@@ -70,7 +70,7 @@ namespace IngameScript
                 var refinery = state.Static.RefineryFactory.TryResolveRefinery(block, refinerySpeedFactor);
                 if (refinery == null)
                 {
-                    Debug.Write(Debug.Level.Warning, "Unrecognised refinery type: {0}", block.BlockDefinition);
+                    Debug.Write(Debug.Level.Warning, new Message("Unrecognised refinery type: {0}/{1}", block.BlockDefinition.TypeIdString, block.BlockDefinition.SubtypeId));
                 }
                 else
                 {

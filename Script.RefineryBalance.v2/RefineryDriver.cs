@@ -38,17 +38,17 @@ namespace IngameScript
         // Iterate until complete. Yields at each possible break point.
         public IEnumerator<object> Run(TimeSpan timeSinceLastRun, IMyGridTerminalSystem gts)
         {
-            Debug.Write(Debug.Level.Debug, "Begin: {0}", DateTime.Now);
+            Debug.Write(Debug.Level.Debug, new Message("Begin: {0}", Datestamp.Seconds));
 
             // Collect blocks:
             ScanRefineriesIfNecessary(gts);
-            Debug.Write(Debug.Level.Info, "Managing {0} refineries at global speed {1}x", refineries.Count, state.RefinerySpeedFactor);
+            Debug.Write(Debug.Level.Info, new Message("Managing {0} refineries at global speed {1}x", refineries.Count, state.RefinerySpeedFactor));
 
             ScanAssemblersIfNecessary(gts);
-            Debug.Write(Debug.Level.Info, "Total assembler speed: {0}", totalAssemblerSpeed);
+            Debug.Write(Debug.Level.Info, new Message("Total assembler speed: {0}", totalAssemblerSpeed));
 
             ScanContainersIfNecessary(gts);
-            Debug.Write(Debug.Level.Info, "Using {0} containers", inventoryOwners.Count);
+            Debug.Write(Debug.Level.Info, new Message("Using {0} containers", inventoryOwners.Count));
 
             yield return null;
 
@@ -71,7 +71,7 @@ namespace IngameScript
                 yield return null;
             }
 
-            Debug.Write(Debug.Level.Debug, "End: {0}", DateTime.Now);
+            Debug.Write(Debug.Level.Debug, new Message("End: {0}", Datestamp.Seconds));
         }
 
         public void RescanAll()

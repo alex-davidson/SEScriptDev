@@ -58,13 +58,13 @@ namespace IngameScript
                         }
                         if (configuration.Displays.Count(d => d.DisplayName == displayConfiguration.DisplayName) > 1)
                         {
-                            Debug.Write(Debug.Level.Error, "Duplicate display name: {0}", displayConfiguration.DisplayName);
+                            Debug.Write(Debug.Level.Error, new Message("Duplicate display name: {0}", displayConfiguration.DisplayName));
                             return false;
                         }
                         break;
 
                     default:
-                        Debug.Write(Debug.Level.Error, "Unrecognised parameter: {0}", parts.Current);
+                        Debug.Write(Debug.Level.Error, new Message("Unrecognised parameter: {0}", parts.Current));
                         return false;
                 }
             }

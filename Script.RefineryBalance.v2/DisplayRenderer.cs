@@ -34,7 +34,7 @@ namespace IngameScript
             local_UpdateIngotDisplay_builder.Clear();
 
             // Clear previous state.
-            local_UpdateIngotDisplay_builder.AppendFormat("Ingot stockpiles  {0:dd MMM HH:mm}\n", DateTime.Now);
+            local_UpdateIngotDisplay_builder.AppendFormat("Ingot stockpiles  {0}\n", Datestamp.Minutes);
 
             foreach (var stockpile in ingotStockpiles)
             {
@@ -75,7 +75,7 @@ namespace IngameScript
             // Clear previous state.
             local_UpdateOreDisplay_builder.Clear();
             
-            local_UpdateOreDisplay_builder.AppendFormat("Ore stockpiles  {0:dd MMM HH:mm}\n", DateTime.Now);
+            local_UpdateOreDisplay_builder.AppendFormat("Ore stockpiles  {0}\n", Datestamp.Minutes);
 
             var totalConsumeSpeed = 0.0;
             var totalProduceSpeed = 0.0;

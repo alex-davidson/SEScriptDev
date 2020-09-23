@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Text;
 
 namespace IngameScript
@@ -30,6 +29,11 @@ namespace IngameScript
         public void WriteTo(StringBuilder builder)
         {
             if (format == null) return;
+            if (format == "{0}")
+            {
+                builder.Append(arg0);
+                return;
+            }
             args[0] = arg0;
             args[1] = arg1;
             args[2] = arg2;
@@ -37,5 +41,7 @@ namespace IngameScript
         }
 
         public override string ToString() => format == null ? "" : string.Format(format, arg0, arg1, arg2);
+
+        public static implicit operator Message(string str) => new Message("{0}", str);
     }
 }

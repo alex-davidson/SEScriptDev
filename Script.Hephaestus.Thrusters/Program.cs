@@ -44,7 +44,7 @@ namespace IngameScript
                         configuration.TestedHash = state.GetCurrentHash();
                         state.BowEngines.BeginTest();
                         state.MidshipsEngines.BeginTest();
-                        commandState = new Message("Running test pattern.");
+                        commandState = "Running test pattern.";
                         break;
 
                     case "set":
@@ -80,7 +80,7 @@ namespace IngameScript
                     case "stop":
                         state.BowEngines.Stop();
                         state.MidshipsEngines.Stop();
-                        commandState = new Message("Stopped.");
+                        commandState = "Stopped.";
                         break;
 
                     case "rescan":
@@ -100,7 +100,7 @@ namespace IngameScript
             stateErrors.Clear();
             if (state.GetCurrentHash() != configuration.TestedHash)
             {
-                stateErrors.SafetyConcerns.Add(new Message("Configuration has changed since the last test."));
+                stateErrors.SafetyConcerns.Add("Configuration has changed since the last test.");
             }
             state.BowEngines.CheckState(stateErrors);
             state.MidshipsEngines.CheckState(stateErrors);
@@ -139,7 +139,7 @@ namespace IngameScript
             {
                 Runtime.UpdateFrequency &= ~UpdateFrequency.Update10;
                 Debug.Write(Debug.Level.Info, "Completed.");
-                commandState = new Message("Idle.");
+                commandState = "Idle.";
                 if (state.PendingRescan)
                 {
                     state = null;

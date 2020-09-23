@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace IngameScript
 {
@@ -28,15 +27,15 @@ namespace IngameScript
         {
             Debug.maximumLevel = maximumLevel;
             Debug.echo = echo;
-            Write($"Initialised: {DateTime.Now:dd MMM HH:mm}");
+            Write(new Message("Initialised: {0}", Datestamp.Minutes));
         }
 
-        private static void Write(string message, params object[] args)
+        private static void Write(Message message)
         {
             if (echo == null) return;
-            var line = string.Format(message, args);
+            var line = message.ToString();
             buffer.Add(line);
-            echo(string.Format(message, args));
+            echo(line);
         }
 
         public static void RestoreBuffer()
@@ -53,28 +52,28 @@ namespace IngameScript
             buffer.Clear();
         }
 
-        public static void Write(Level level, string message, params object[] args)
+        public static void Write(Level level, Message message)
         {
             if (level > maximumLevel) return;
-            Write(message, args);
+            Write(message);
         }
 
         public static void Assert(bool condition, string failureText)
         {
             if (condition) return;
-            Write("[ASSERT] {0}", failureText);
+            Write(new Message("[ASSERT] {0}", failureText));
             throw new Exception(failureText);
         }
 
         public static void Fail(string failureText)
         {
-            Write("[FAIL] {0}", failureText);
+            Write(new Message("[FAIL] {0}", failureText));
             throw new Exception(failureText);
         }
 
         public static void Warn(string failureText)
         {
-            Write("[WARN] {0}", failureText);
+            Write(new Message("[WARN] {0}", failureText));
         }
     }
 

@@ -13,6 +13,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)BlockDetailsParser.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Clock.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Constants.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Datestamp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Debug.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Extensions.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IAccumulator.cs" />

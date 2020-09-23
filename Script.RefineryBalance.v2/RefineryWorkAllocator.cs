@@ -60,14 +60,14 @@ namespace IngameScript
                 var workProvidedSeconds = TryFillRefinery(worklist.Current, blueprint, worklist.PreferredWorkSeconds);
                 if (workProvidedSeconds <= 0)
                 {
-                    Debug.Write(Debug.Level.All, "Unable to allocate any {0}, moving to next candidate.", blueprint.Input.ItemType.SubtypeId);
+                    Debug.Write(Debug.Level.All, new Message("Unable to allocate any {0}, moving to next candidate.", blueprint.Input.ItemType.SubtypeId));
                     continue;
                 }
                 assignedWork = true;
                 var isRefinerySatisfied = worklist.AssignedWork(ref workProvidedSeconds);
                 if (workProvidedSeconds > 0)
                 {
-                    Debug.Write(Debug.Level.Debug, "Provided {0} seconds of work using {1}.", workProvidedSeconds, blueprint.Name);
+                    Debug.Write(Debug.Level.Debug, new Message("Provided {0} seconds of work using {1}.", workProvidedSeconds, blueprint.Name));
                     // Some of the new work will be processed before next iteration. Update our estimates.
                     ingotWorklist.UpdateStockpileEstimates(worklist.Current, blueprint, workProvidedSeconds);
                 }

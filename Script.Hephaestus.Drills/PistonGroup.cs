@@ -97,8 +97,8 @@ namespace IngameScript
 
         public void CheckState(Errors errors)
         {
-            if (hasMismatchedStacks) errors.SafetyConcerns.Add(new Message("Mismatched piston stacks."));
-            if (hasMismatchedExtensions) errors.SafetyConcerns.Add(new Message("Mismatched piston stack extensions."));
+            if (hasMismatchedStacks) errors.SafetyConcerns.Add("Mismatched piston stacks.");
+            if (hasMismatchedExtensions) errors.SafetyConcerns.Add("Mismatched piston stack extensions.");
         }
     }
 }

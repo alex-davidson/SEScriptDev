@@ -54,7 +54,7 @@ namespace IngameScript
             foreach (var group in displayGroups)
             {
                 local_EndDraw_stringBuilder.Clear();
-                local_EndDraw_stringBuilder.AppendLine(DateTime.Now.ToString("dd MMM HH:mm"));
+                local_EndDraw_stringBuilder.AppendLine(Datestamp.Minutes.ToString());
                 if (parts.Any())
                 {
                     parts[0].Draw(group.Key, local_EndDraw_stringBuilder);

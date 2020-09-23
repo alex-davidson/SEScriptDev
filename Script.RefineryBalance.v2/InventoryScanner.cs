@@ -44,7 +44,7 @@ namespace IngameScript
 
         public void Scan(IMyEntity inventoryOwner)
         {
-            Debug.Write(Debug.Level.All, "Scanning: '{0}'", inventoryOwner.DisplayName);
+            Debug.Write(Debug.Level.All, new Message("Scanning: '{0}'", inventoryOwner.DisplayName));
             var isRefinery = inventoryOwner is IMyRefinery;
 
             for (var i = 0; i < inventoryOwner.InventoryCount; i++)
@@ -55,7 +55,6 @@ namespace IngameScript
                     var item = inventory.GetItemAt(j);
                     if (item == null) continue;
                     var itemType = new ItemType(item.Value.Type.TypeId, item.Value.Type.SubtypeId);
-                    Debug.Write(Debug.Level.All, "Found: {0}/{1}  {2}", item.Value.Type.TypeId, item.Value.Type.SubtypeId, item.Value.Amount);
                     AddIngots(itemType, (double)item.Value.Amount);
                     if (!isRefinery) AddOre(itemType, inventory, item.Value.ItemId);
                 }

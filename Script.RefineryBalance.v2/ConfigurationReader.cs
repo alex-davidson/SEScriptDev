@@ -55,7 +55,7 @@ namespace IngameScript
                         break;
 
                     default:
-                        Debug.Write(Debug.Level.Error, "Unrecognised parameter: {0}", parts.Current);
+                        Debug.Write(Debug.Level.Error, new Message("Unrecognised parameter: {0}", parts.Current));
                         return false;
                 }
             }
@@ -118,7 +118,7 @@ namespace IngameScript
             return true;
         }
 
-        private static bool ExpectNext(IEnumerator<string> parts, string error)
+        private static bool ExpectNext(IEnumerator<string> parts, Message error)
         {
             if (parts.MoveNext()) return true;
             Debug.Write(Debug.Level.Error, error);
@@ -135,7 +135,7 @@ namespace IngameScript
                 numberOrNull = number;
                 return true;
             }
-            Debug.Write(Debug.Level.Error,  "Expected a numeric value or '?', but found '{0}'.", part);
+            Debug.Write(Debug.Level.Error, new Message("Expected a numeric value or '?', but found '{0}'.", part));
             return false;
         }
     }

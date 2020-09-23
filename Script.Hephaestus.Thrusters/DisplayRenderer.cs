@@ -19,7 +19,7 @@ namespace IngameScript
             if (display == null) return;
 
             local_Render_builder.Clear();
-            local_Render_builder.AppendFormat("Engine modules  {0:dd MMM HH:mm}\n", DateTime.Now);
+            local_Render_builder.AppendFormat("Engine modules  {0}\n", Datestamp.Minutes);
             if (!default(Message).Equals(commandState))
             {
                 commandState.WriteTo(local_Render_builder);

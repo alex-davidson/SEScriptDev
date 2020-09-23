@@ -115,7 +115,7 @@ namespace IngameScript
                 if (kv.Value.Display != null)
                 {
                     local_display_builder.Clear();
-                    local_display_builder.AppendFormat("Drill Tower {0}  {1:dd MMM HH:mm}\n", kv.Key, DateTime.Now);
+                    local_display_builder.AppendFormat("Drill Tower {0}  {1}\n", kv.Key, Datestamp.Minutes);
                     kv.Value.Describe(local_display_builder);
                     kv.Value.Display.WriteText(local_display_builder);
                 }

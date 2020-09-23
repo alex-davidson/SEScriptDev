@@ -122,7 +122,7 @@ namespace IngameScript
                 Runtime.UpdateFrequency &= ~UpdateFrequency.Update1;
                 if (yieldCount > 0)
                 {
-                    Debug.Write(Debug.Level.Info, "Completed in {0} updates.", yieldCount);
+                    Debug.Write(Debug.Level.Info, new Message("Completed in {0} updates.", yieldCount));
                     yieldCount = 0;
                 }
                 else

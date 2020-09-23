@@ -31,15 +31,15 @@ namespace IngameScript
 
         public IEnumerator<object> Run(TimeSpan timeSinceLastRun, IMyGridTerminalSystem gts)
         {
-            Debug.Write(Debug.Level.Debug, "Begin: {0}", DateTime.Now);
+            Debug.Write(Debug.Level.Debug, new Message("Begin: {0}", Datestamp.Seconds));
 
             // Collect blocks:
             foreach (var yieldPoint in ScanBlocksIfNecessary(gts))
             {
                 yield return yieldPoint;
             }
-            Debug.Write(Debug.Level.Info, "Using {0} display groups", displays.Count);
-            Debug.Write(Debug.Level.Info, "Scanning {0} blocks", scanBlocks.Count);
+            Debug.Write(Debug.Level.Info, new Message("Using {0} display groups", displays.Count));
+            Debug.Write(Debug.Level.Info, new Message("Scanning {0} blocks", scanBlocks.Count));
 
             yield return null;
 
@@ -62,7 +62,7 @@ namespace IngameScript
                 display.EndDraw();
             }
 
-            Debug.Write(Debug.Level.Debug, "End: {0}", DateTime.Now);
+            Debug.Write(Debug.Level.Debug, new Message("End: {0}", Datestamp.Seconds));
         }
 
         private IEnumerable<object> ScanBlocksIfNecessary(IMyGridTerminalSystem gts)
@@ -81,12 +81,12 @@ namespace IngameScript
                     gts.GetBlocksOfType(displayBlocks, b => b.CustomName == displayConfiguration.DisplayName);
                     if (!displayBlocks.Any())
                     {
-                        Debug.Write(Debug.Level.Warning, "Display does not exist: {0}", displayConfiguration.DisplayName);
+                        Debug.Write(Debug.Level.Warning, new Message("Display does not exist: {0}", displayConfiguration.DisplayName));
                         continue;
                     }
                     if (!displayBlocks.Any(d => d.IsOperational()))
                     {
-                        Debug.Write(Debug.Level.Info, "Display is not operational: {0}", displayConfiguration.DisplayName);
+                        Debug.Write(Debug.Level.Info, new Message("Display is not operational: {0}", displayConfiguration.DisplayName));
                         continue;
                     }
                     displays.Add(displayRendererFactory.Create(displayBlocks, displayConfiguration));

@@ -26,7 +26,7 @@ namespace IngameScript
                         break;
 
                     default:
-                        Debug.Write(Debug.Level.Error, "Unrecognised parameter: {0}", parts.Current);
+                        Debug.Write(Debug.Level.Error, new Message("Unrecognised parameter: {0}", parts.Current));
                         return false;
                 }
             }
