@@ -135,14 +135,14 @@ namespace IngameScript
 
         class State
         {
-            public Dictionary<char, DrillTower> Towers { get; } = new Dictionary<char, DrillTower>();
+            public Dictionary<string, DrillTower> Towers { get; } = new Dictionary<string, DrillTower>();
             public bool PendingRescan { get; set; } = true;
 
             public DrillTower GetDrillTower(string designation)
             {
                 if (designation?.Length != 1) return null;
                 DrillTower tower;
-                Towers.TryGetValue(designation[0], out tower);
+                Towers.TryGetValue(designation, out tower);
                 return tower;
             }
         }

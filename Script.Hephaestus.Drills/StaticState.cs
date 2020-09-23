@@ -6,15 +6,15 @@
 
         public DrillTowerDef[] DrillTowers =
         {
-            new DrillTowerDef('A'),
-            new DrillTowerDef('B'),
-            new DrillTowerDef('C'),
-            new DrillTowerDef('D'),
+            new DrillTowerDef("A"),
+            new DrillTowerDef("B"),
+            new DrillTowerDef("C"),
+            new DrillTowerDef("D"),
         };
 
         public struct DrillTowerDef
         {
-            public char Letter { get; }
+            public string Letter { get; }
             public string PistonGroupName { get; }
             public string RotorName { get; }
             public string DrillGroupName { get; }
@@ -22,7 +22,7 @@
             public string FloodlightsName { get; }
             public string DisplayName { get; }
 
-            public DrillTowerDef(char letter)
+            public DrillTowerDef(string letter)
             {
                 Letter = letter;
                 PistonGroupName = $"Pistons (Drill Tower {letter})";
