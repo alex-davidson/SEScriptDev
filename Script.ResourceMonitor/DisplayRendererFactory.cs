@@ -19,7 +19,7 @@ namespace IngameScript
                 }
                 local_Create_partsList.Add(part);
             }
-            return new DisplayRenderer(displays, local_Create_partsList.ToArray());
+            return new DisplayRenderer(configuration.DisplayName, displays, local_Create_partsList.ToArray());
         }
 
         private IDisplayPart GenerateDisplayPart(string categoryDescriptor)

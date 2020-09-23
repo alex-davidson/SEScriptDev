@@ -9,47 +9,61 @@ namespace IngameScript
 {
     public class DisplayRenderer
     {
+        public string Name { get; }
         private readonly IGrouping<IMyCubeGrid, IMyTextPanel>[] displayGroups;
         private readonly IDisplayPart[] parts;
+        private readonly List<IMyTerminalBlock> scanBlocks = new List<IMyTerminalBlock>(Constants.ALLOC_SCAN_BLOCK_COUNT);
 
-        public DisplayRenderer(IEnumerable<IMyTextPanel> displays, IDisplayPart[] parts)
+        public DisplayRenderer(string name, IEnumerable<IMyTextPanel> displays, IDisplayPart[] parts)
         {
+            Name = name;
             this.displayGroups = displays.GroupBy(d => d.CubeGrid).ToArray();
             this.parts = parts;
         }
 
-        public static IBlockFilter GetBlockFilter(IEnumerable<DisplayRenderer> renderers) => new BlockFilter(renderers);
-
-        class BlockFilter : IBlockFilter
+        public IEnumerable<object> RescanBlocks(List<IMyTerminalBlock> candidateBlocks)
         {
-            private readonly IEnumerable<DisplayRenderer> renderers;
-
-            public BlockFilter(IEnumerable<DisplayRenderer> renderers)
+            scanBlocks.Clear();
+            for (var i = 0; i < candidateBlocks.Count; i++)
             {
-                this.renderers = renderers;
-            }
-
-            public bool Filter(IMyTerminalBlock block)
-            {
-                foreach (var renderer in renderers)
+                foreach (var part in parts)
                 {
-                    foreach (var part in renderer.parts)
+                    if (part.Filter(candidateBlocks[i]))
                     {
-                        if (part.Filter(block)) return true;
+                        scanBlocks.Add(candidateBlocks[i]);
                     }
                 }
-                return false;
+
+                // Block filtering is probably not very intensive, but we still need to yield
+                // periodically, and the main loop is yielding to the game every X (default 20)
+                // of our yields...
+                if (i % 3 == 0) yield return null;
             }
         }
 
-        public IEnumerable<IDisplayCollector> BeginDraw()
+        public int BlockCount => scanBlocks.Count;
+
+        public IEnumerable<object> Update()
         {
             foreach (var part in parts) part.Clear();
-            return parts;
+
+            var i = 0;
+            foreach (var block in scanBlocks)
+            {
+                i++;
+                foreach (var part in parts) part.Visit(block);
+
+                // Inventory scanning is probably not very intensive, but we still need to yield
+                // periodically, and the main loop is yielding to the game every X (default 20)
+                // of our yields...
+                if (i % 3 == 0) yield return null;
+            }
+            yield return null;
+            DrawDisplays();
         }
 
         private readonly StringBuilder local_EndDraw_stringBuilder = new StringBuilder(Constants.ALLOC_DISPLAY_BUFFER_SIZE);
-        public void EndDraw()
+        private void DrawDisplays()
         {
             foreach (var group in displayGroups)
             {
@@ -72,18 +86,14 @@ namespace IngameScript
         }
     }
 
-    public interface IBlockFilter
-    {
-        bool Filter(IMyTerminalBlock block);
-    }
-
-    public interface IDisplayCollector : IBlockFilter
+    public interface IDisplayCollector
     {
         void Visit(IMyTerminalBlock block);
     }
 
     public interface IDisplayPart : IDisplayCollector
     {
+        bool Filter(IMyTerminalBlock block);
         void Clear();
         void Draw(IMyCubeGrid cubeGrid, StringBuilder target);
     }

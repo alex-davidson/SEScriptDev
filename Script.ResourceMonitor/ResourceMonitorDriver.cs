@@ -39,27 +39,16 @@ namespace IngameScript
                 yield return yieldPoint;
             }
             Debug.Write(Debug.Level.Info, new Message("Using {0} display groups", displays.Count));
-            Debug.Write(Debug.Level.Info, new Message("Scanning {0} blocks", scanBlocks.Count));
 
             yield return null;
 
-            var i = 0;
             foreach (var display in displays)
             {
-                var collectors = display.BeginDraw();
-                foreach (var collector in collectors)
+                Debug.Write(Debug.Level.Info, new Message("Display {0}: scanning {1} blocks", display.Name, display.BlockCount));
+                foreach (var yieldPoint in display.Update())
                 {
-                    foreach (var block in scanBlocks)
-                    {
-                        i++;
-                        collector.Visit(block);
-                        // Inventory scanning is probably not very intensive, but we still need to yield
-                        // periodically, and the main loop is yielding to the game every X (default 20)
-                        // of our yields...
-                        if (i % 3 == 0) yield return null;
-                    }
+                    yield return yieldPoint;
                 }
-                display.EndDraw();
             }
 
             Debug.Write(Debug.Level.Debug, new Message("End: {0}", Datestamp.Seconds));
@@ -94,25 +83,14 @@ namespace IngameScript
 
                 gts.GetBlocksOfType(scanBlocks, blockRuleFilter.Filter);
 
-                var i = 0;
-                var j = 0;
-                var displayFilter = DisplayRenderer.GetBlockFilter(displays);
-                while (j < scanBlocks.Count)
+                foreach (var display in displays)
                 {
-                    i++;
-                    if (!displayFilter.Filter(scanBlocks[j]))
+                    foreach (var yieldPoint in display.RescanBlocks(scanBlocks))
                     {
-                        scanBlocks.RemoveAtFast(j);
+                        yield return yieldPoint;
                     }
-                    else
-                    {
-                        j++;
-                    }
-                    // Block filtering is probably not very intensive, but we still need to yield
-                    // periodically, and the main loop is yielding to the game every X (default 20)
-                    // of our yields...
-                    if (i % 3 == 0) yield return null;
                 }
+                scanBlocks.Clear();
                 rescanBlocks = false;
             }
         }
