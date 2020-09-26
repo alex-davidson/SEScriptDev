@@ -53,7 +53,10 @@ Conventions:
 
 The thruster rotors are controlled by tier.
 * The midships modules can point outwards (90 degrees) or backwards (5 degrees).
-* The bow modules can point forwards (180 degrees), outwards (90 degrees) or backwards (30 degrees).
+* The bow modules can point forwards (180 degrees), outwards (90 degrees) or backwards (15 degrees).
+
+The difference between 30 and 15 degrees bow thruster rotation equates to ~2.4 thrusters, or ~1.76 Kt of launch
+mass.
 
 ## Ergonomics and Experience
 

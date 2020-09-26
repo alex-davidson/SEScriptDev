@@ -14,7 +14,7 @@
                 new [] {
                     new EnginePresetDef("Forward", 180),
                     new EnginePresetDef("Outward", 90),
-                    new EnginePresetDef("Backward", 30),
+                    new EnginePresetDef("Backward", 15),
                 });
             Midships = new EngineTierDef(
                 GenerateModuleTier("Midships"),
