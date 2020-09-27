@@ -31,8 +31,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.PowerManagement", "S
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.PowerManagement.UnitTests", "Script.PowerManagement.UnitTests\Script.PowerManagement.UnitTests.csproj", "{9CF04AF5-18C3-4BEB-87C1-A5695DF0F830}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.Hephaestus.ThrusterSync", "Script.Hephaestus.ThrusterSync\Script.Hephaestus.ThrusterSync.csproj", "{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}"
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{0cff3a23-46e4-439a-95db-1bf40f95ae72}*SharedItemsImports = 4
+		Shared.Core\Shared.Core.projitems*{0cff3a23-46e4-439a-95db-1bf40f95ae72}*SharedItemsImports = 4
 		Shared.Core\Shared.Core.projitems*{120ad54b-3568-4d4c-9eed-ce346af05863}*SharedItemsImports = 4
 		Shared.Testing\Shared.Testing.projitems*{122051cb-5324-41ce-81ec-547250f631c3}*SharedItemsImports = 4
 		Shared.Testing\Shared.Testing.projitems*{1dae0091-80af-41f4-b381-3225cdf5b4cd}*SharedItemsImports = 4
@@ -148,6 +152,13 @@ Global
 		{9CF04AF5-18C3-4BEB-87C1-A5695DF0F830}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9CF04AF5-18C3-4BEB-87C1-A5695DF0F830}.Release|x64.ActiveCfg = Release|Any CPU
 		{9CF04AF5-18C3-4BEB-87C1-A5695DF0F830}.Release|x64.Build.0 = Release|Any CPU
+		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Debug|x64.ActiveCfg = Debug|x64
+		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Debug|x64.Build.0 = Debug|x64
+		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Release|Any CPU.ActiveCfg = Debug|x64
+		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Release|Any CPU.Build.0 = Debug|x64
+		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Release|x64.ActiveCfg = Debug|x64
+		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Release|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
