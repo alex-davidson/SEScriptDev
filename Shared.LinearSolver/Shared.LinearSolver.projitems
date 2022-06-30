@@ -1,0 +1,40 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>476ebd47-0a65-4bd8-ba09-0b686e0e022b</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Shared.LinearSolver</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Constraints\Constrain.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Constraints\Constraint.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Constraints\ConstraintList.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Constraints\LinearConstraint.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DebugWriter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)IDebugWriter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MatrixOp.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SimplexOp.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SimplexResult.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)SimplexSolver.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Solution.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Tableau.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TableauBuilder.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TableauRenderer.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)Constraints\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)Documentation\Simplex.md" />
+    <Content Include="$(MSBuildThisFileDirectory)Documentation\Simplex.Pivot.md" />
+    <Content Include="$(MSBuildThisFileDirectory)Documentation\Simplex.GeneralCase.md" />
+    <Content Include="$(MSBuildThisFileDirectory)Documentation\Simplex.SimpleCaseMinimise.md" />
+    <Content Include="$(MSBuildThisFileDirectory)Documentation\Simplex.SimpleCaseMaximise.md" />
+  </ItemGroup>
+</Project>

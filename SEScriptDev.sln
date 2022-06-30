@@ -33,6 +33,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.PowerManagement.Unit
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.Hephaestus.ThrusterSync", "Script.Hephaestus.ThrusterSync\Script.Hephaestus.ThrusterSync.csproj", "{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared.LinearSolver", "Shared.LinearSolver\Shared.LinearSolver.shproj", "{476EBD47-0A65-4BD8-BA09-0B686E0E022B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.LinearSolver.UnitTests", "Shared.LinearSolver.UnitTests\Shared.LinearSolver.UnitTests.csproj", "{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}"
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{0cff3a23-46e4-439a-95db-1bf40f95ae72}*SharedItemsImports = 4
@@ -42,11 +46,13 @@ Global
 		Shared.Testing\Shared.Testing.projitems*{1dae0091-80af-41f4-b381-3225cdf5b4cd}*SharedItemsImports = 4
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{24954313-b442-47f5-886e-f020c205fca5}*SharedItemsImports = 4
 		Shared.Core\Shared.Core.projitems*{24954313-b442-47f5-886e-f020c205fca5}*SharedItemsImports = 4
+		Shared.LinearSolver\Shared.LinearSolver.projitems*{476ebd47-0a65-4bd8-ba09-0b686e0e022b}*SharedItemsImports = 13
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{6219a884-20ea-4f5f-9810-c1dec259dc74}*SharedItemsImports = 4
 		Shared.Core\Shared.Core.projitems*{6219a884-20ea-4f5f-9810-c1dec259dc74}*SharedItemsImports = 4
 		Shared.Testing\Shared.Testing.projitems*{65b22e17-2eaf-425a-bce4-3c3884f61afb}*SharedItemsImports = 13
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{7604fd66-4cee-432b-91f4-1432f64f2033}*SharedItemsImports = 4
 		Shared.Core\Shared.Core.projitems*{7604fd66-4cee-432b-91f4-1432f64f2033}*SharedItemsImports = 4
+		Shared.LinearSolver\Shared.LinearSolver.projitems*{86bcc3aa-0bea-4881-bbce-b1e496fabfea}*SharedItemsImports = 4
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{91a5b814-20a5-49df-bde9-e299b8e1102c}*SharedItemsImports = 13
 		Shared.Testing\Shared.Testing.projitems*{92f4f198-53a7-479d-b7b5-b1fa0b28a26c}*SharedItemsImports = 4
 		Shared.Testing\Shared.Testing.projitems*{9cf04af5-18c3-4beb-87c1-a5695df0f830}*SharedItemsImports = 4
@@ -159,6 +165,14 @@ Global
 		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Release|Any CPU.Build.0 = Debug|x64
 		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Release|x64.ActiveCfg = Debug|x64
 		{0CFF3A23-46E4-439A-95DB-1BF40F95AE72}.Release|x64.Build.0 = Debug|x64
+		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Debug|x64.Build.0 = Debug|Any CPU
+		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Release|x64.ActiveCfg = Release|Any CPU
+		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
