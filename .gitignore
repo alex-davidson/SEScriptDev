@@ -16,3 +16,6 @@ data/
 */MDK/whitelist.cache
 *_Backup_*.zip
 *.DotSettings
+*.ncrunchproject
+*.ncrunchsolution
+
