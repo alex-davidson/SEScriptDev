@@ -50,11 +50,20 @@ namespace Shared.LinearSolver
             var columnCount = 3 + variableCount + constraintCount + constraintCount;
             var rowCount = 2 + constraintCount;
 
+            Pivots = new ReadSortedPivotList(SolveFor * ConstraintCount);
+
             // Initialised with zeroes.
             BasicVariables = new int[rowCount];
             Matrix = new float[rowCount, columnCount];
         }
 
+        /// <summary>
+        /// Temporary list used to hold candidate pivots.
+        /// </summary>
+        public ReadSortedPivotList Pivots { get; }
+        /// <summary>
+        /// Associates basic variable column indices with rows.
+        /// </summary>
         public int[] BasicVariables { get; }
         /// <remarks>
         ///                 x1 ... xn   s1 ... sn   a1 ... an   z   z'  |   target

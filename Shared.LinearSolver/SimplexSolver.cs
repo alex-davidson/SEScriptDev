@@ -1,4 +1,6 @@
-﻿namespace Shared.LinearSolver
+﻿using System;
+
+namespace Shared.LinearSolver
 {
     public struct SimplexSolver
     {
@@ -58,10 +60,18 @@
         /// </summary>
         private Solution ExtractSolution(Tableau tableau)
         {
+            var result = SimplexResult.OptimalSolution;
             for (var i = 0; i < tableau.SolveFor; i++)
             {
                 var eliminateCoefficient = tableau.Matrix[Tableau.Phase2ObjectiveRow, i];
                 if (eliminateCoefficient < 0) return new Solution { Result = SimplexResult.Unbounded };
+                if (eliminateCoefficient == 0)
+                {
+                    if (Array.IndexOf(tableau.BasicVariables, i, Tableau.FirstConstraintRow) < 0)
+                    {
+                        result = SimplexResult.MultipleSolutions;
+                    } 
+                }
             }
 
             var solution = new float[tableau.VariableCount];
@@ -69,7 +79,7 @@
 
             return new Solution
             {
-                Result = SimplexResult.OptimalSolution,
+                Result = result,
                 Values = solution,
                 Optimised = SimplexOp.Score(tableau, Tableau.Phase2ObjectiveRow, tableau.Phase2OptimiseColumn),
             };
@@ -95,21 +105,15 @@
             var remainingArtificialVariables = tableau.ArtificialVariableCount;
             while (remainingArtificialVariables > 0)
             {
-                var initial = remainingArtificialVariables;
+                tableau.Pivots.Clear();
                 for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
                 {
                     if (!tableau.IsArtificialVariable(tableau.BasicVariables[c])) continue;
-
-                    if (!SimplexOp.TrySelectPivotColumn(tableau, c, out var i, debug)) continue;
-                    if (!SimplexOp.TryPivot(tableau, i, c, debug)) continue;
-
-                    remainingArtificialVariables--;
-
-                    debug?.Write("Phase 1, step", tableau);
+                    SimplexOp.CollectPivotsForRow(tableau, c);
                 }
-
-                // Made an entire pass with no pivots.
-                if (initial == remainingArtificialVariables) return false;
+                if (!SimplexOp.TryApplyPivot(tableau, debug)) return false;
+                debug?.Write("Phase 1, step", tableau);
+                remainingArtificialVariables--;
             }
 
             if (tableau.Matrix[Tableau.Phase1ObjectiveRow, tableau.TargetColumn] != 0) return false;

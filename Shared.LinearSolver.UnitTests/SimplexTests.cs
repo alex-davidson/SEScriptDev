@@ -1,8 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
+using System.Threading;
 using NUnit.Framework;
 using Shared.LinearSolver.Constraints;
 
@@ -309,9 +309,57 @@ namespace Shared.LinearSolver.UnitTests
         [TestCaseSource(nameof(Cases))]
         public void Test(Case testCase)
         {
-            var solver = SimplexSolver.Given(testCase.Constraints, Debug);
-            var solution = testCase.IsMaximise ? solver.Maximise(testCase.Maximise.ToArray()) : solver.Minimise(testCase.Minimise.ToArray());
+            var solution = SolveCase(testCase, Debug);
             AssertSolution(testCase.Expected, solution);
+        }
+
+        [Test, Explicit]
+        public void FuzzTest()
+        {
+            var random = new Random();
+            const int tests = 10000;
+
+            for (var i = 0; i < tests; i++)
+            {
+                var seed = random.Next();
+                var generator = new FuzzTestGenerator(seed)
+                {
+                    MinimumVariables = 20,
+                    MaximumVariables = 40,
+                };
+                try
+                {
+                    using (var cts = new CancellationTokenSource())
+                    using (cts.Token.Register(() => System.Diagnostics.Debug.Fail($"Seed {generator.Seed} exceeded time limit")))
+                    {
+                        cts.CancelAfter(TimeSpan.FromSeconds(1));
+
+                        var testCase = generator.GenerateCase();
+                        SolveCase(testCase, null);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Assert.Fail($"Failed for seed {seed}\n{ex}");
+                }
+            }
+        }
+
+        [TestCase(755170474)]
+        [TestCase(237919398)]
+        [TestCase(197840323)]
+        [TestCase(2026819511)]
+        [TestCase(812444773)]
+        [Timeout(1000)]
+        public void TestKnownSeeds(int seed)
+        {
+            var generator = new FuzzTestGenerator(seed)
+            {
+                MinimumVariables = 2,
+                MaximumVariables = 4,
+            };
+            var testCase = generator.GenerateCase();
+            SolveCase(testCase, Debug);
         }
 
         private void AssertSolution(Solution expected, Solution actual)
@@ -319,6 +367,12 @@ namespace Shared.LinearSolver.UnitTests
             Assert.That(actual.Values, Is.EqualTo(expected.Values)); ;
             Assert.That(actual.Optimised, Is.EqualTo(expected.Optimised));
             Assert.That(actual.Result, Is.EqualTo(expected.Result));
+        }
+
+        private Solution SolveCase(Case testCase, IDebugWriter debug = null)
+        {
+            var solver = SimplexSolver.Given(testCase.Constraints, debug);
+            return testCase.IsMaximise ? solver.Maximise(testCase.Maximise.ToArray()) : solver.Minimise(testCase.Minimise.ToArray());
         }
     }
 }

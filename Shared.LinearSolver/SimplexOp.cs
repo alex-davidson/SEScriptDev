@@ -25,6 +25,7 @@ namespace Shared.LinearSolver
 
         public static bool MaximiseStep(Tableau tableau, IDebugWriter debugWriter)
         {
+            tableau.Pivots.Clear();
             // Eliminate each variable from all but one row.
             // Must include surplus variables in this.
             for (var i = 0; i < tableau.SolveFor; i++)
@@ -32,18 +33,29 @@ namespace Shared.LinearSolver
                 var eliminateCoefficient = tableau.Matrix[Tableau.Phase2ObjectiveRow, i];
                 if (eliminateCoefficient >= 0) continue;   // Nothing to eliminate in row 0?
 
-                if (!TrySelectPivotRow(tableau, i, out var leavingRow, debugWriter)) continue;
-                if (TryPivot(tableau, i, leavingRow, debugWriter)) return true;
-                // Nothing to eliminate?
+                CollectPivotsForColumn(tableau, i);
             }
+            return TryApplyPivot(tableau, debugWriter);
+        }
+
+        public static bool TryApplyPivot(Tableau tableau, IDebugWriter debugWriter)
+        {
+            foreach (var pivot in tableau.Pivots)
+            {
+                debugWriter?.Write($"Candidate: row {tableau.GetRowName(pivot.Row)}, column {tableau.GetVariableName(pivot.Column)}");
+                if (!CheckValidityOfBasicResult(tableau, pivot.Row, pivot.Column, debugWriter)) continue;
+                if (TryPivot(tableau, pivot.Column, pivot.Row, debugWriter)) return true;
+            }
+            // Nothing to eliminate?
             return false;
         }
 
         public static void CollectSolution(Tableau tableau, float[] solution)
         {
-            for (var i = 0; i < tableau.VariableCount; i++)
+            for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
-                TryGetBasicSolution(tableau, i, out solution[i]);
+                var basic = tableau.BasicVariables[c];
+                if (basic < tableau.VariableCount) TryGetBasicSolution(tableau, basic, out solution[basic]);
             }
         }
 
@@ -59,47 +71,28 @@ namespace Shared.LinearSolver
             return true;
         }
 
-
-        private static bool TrySelectPivotRow(Tableau tableau, int pivotColumn, out int pivotRow, IDebugWriter debugWriter)
+        private static void CollectPivotsForColumn(Tableau tableau, int pivotColumn)
         {
-            pivotRow = 0;
-            var best = float.MaxValue;
             for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
                 if (tableau.Matrix[c, pivotColumn] == 0) continue;
                 if (tableau.BasicVariables[c] == pivotColumn) continue; // Cannot pivot a variable on itself.
                 var candidate = Score(tableau, c, pivotColumn);
-                debugWriter.Write($"Candidate row: {tableau.GetRowName(c)} = {candidate}");
-
                 if (candidate <= 0) continue;
-                if (candidate >= best) continue;
-                if (!CheckValidityOfBasicResult(tableau, c, pivotColumn, debugWriter)) continue;
-
-                best = candidate;
-                pivotRow = c;
+                tableau.Pivots.Add(new Pivot(c, pivotColumn), candidate);
             }
-            return pivotRow != 0;
         }
 
-        public static bool TrySelectPivotColumn(Tableau tableau, int pivotRow, out int pivotColumn, IDebugWriter debugWriter)
+        public static void CollectPivotsForRow(Tableau tableau, int pivotRow)
         {
-            pivotColumn = -1;
-            var best = float.MaxValue;
             for (var i = 0; i < tableau.SolveFor; i++)
             {
                 if (tableau.Matrix[pivotRow, i] == 0) continue;
                 if (tableau.BasicVariables[pivotRow] == i) continue; // Cannot pivot a variable on itself.
                 var candidate = Score(tableau, pivotRow, i);
-                debugWriter.Write($"Candidate column: {tableau.GetVariableName(i)} = {candidate}");
-
                 if (candidate <= 0) continue;
-                if (candidate >= best) continue;
-                if (!CheckValidityOfBasicResult(tableau, pivotRow, i, debugWriter)) continue;
-
-                best = candidate;
-                pivotColumn = i;
+                tableau.Pivots.Add(new Pivot(pivotRow, i), candidate);
             }
-            return pivotColumn != -1;
         }
 
         private static bool CheckValidityOfBasicResult(Tableau tableau, int pivotRow, int pivotColumn, IDebugWriter debugWriter)
@@ -120,7 +113,7 @@ namespace Shared.LinearSolver
                 // We only care about the sign of the Score, not the actual value, so use multiplication instead of division here.
                 if (postPivotValue * postPivotTarget < 0)
                 {
-                    debugWriter.Write($"  Invalid: would leave {tableau.GetVariableName(i)} negative");
+                    debugWriter?.Write($"  Invalid: would leave {tableau.GetVariableName(i)} negative");
                     return false;
                 }
             }
