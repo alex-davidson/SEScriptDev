@@ -116,6 +116,28 @@ namespace Shared.LinearSolver
 
         public bool IsArtificialVariable(int index) => index >= firstArtificialVariable;
 
+        public void ReduceRow(int row)
+        {
+            var columns = Matrix.GetLength(1);
+            var min = float.MaxValue;
+            for (var i = 0; i < columns; i++)
+            {
+                var cell = Matrix[row, i];
+                if (cell == 0) continue;;
+                if (cell < 0) cell = -cell;
+                if (cell < min) min = cell;
+            }
+            // Try to reduce numbers in the target row, without losing (significant) accuracy.
+            if (min > 1 && min != float.MaxValue)
+            {
+                var reduce = 1 << (int)Math.Log(min, 2);
+                for (var i = 0; i < columns; i++)
+                {
+                    Matrix[row, i] /= reduce;
+                }
+            }
+        }
+
         public void BeginPhase1()
         {
             Columns.Add(Phase1OptimiseColumn);
