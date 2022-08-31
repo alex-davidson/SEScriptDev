@@ -317,8 +317,8 @@ namespace Shared.LinearSolver.UnitTests
         [Test, Explicit]
         public void FuzzTest()
         {
-            var random = new Random();
-            const int tests = 10000;
+            var random = new Random(42);
+            const int tests = 50000;
 
             for (var i = 0; i < tests; i++)
             {
