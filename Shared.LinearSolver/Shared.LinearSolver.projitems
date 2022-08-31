@@ -23,8 +23,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)SimplexSolver.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Solution.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Tableau.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)TableauBuilder.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)TableauRenderer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Debug\TableauRenderer.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Constraints\" />

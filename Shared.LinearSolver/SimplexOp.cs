@@ -13,7 +13,7 @@ namespace Shared.LinearSolver
     ///   * Now actually just the row number, as rows 0 and 1 are used for the optimisation targets.
     /// * i is the coefficient index, ie. the column number of the matrix.
     /// </remarks>
-    static class SimplexOp
+    internal static class SimplexOp
     {
         /// <summary>
         /// Return the ratio of the specified cell to the target value in the same row.
