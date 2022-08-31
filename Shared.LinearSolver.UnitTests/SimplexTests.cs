@@ -317,6 +317,38 @@ namespace Shared.LinearSolver.UnitTests
         [Test, Explicit]
         public void FuzzTest()
         {
+            var random = new Random();
+            const int tests = 10000;
+
+            for (var i = 0; i < tests; i++)
+            {
+                var seed = random.Next();
+                var generator = new FuzzTestGenerator(seed)
+                {
+                    MinimumVariables = 20,
+                    MaximumVariables = 40,
+                };
+                try
+                {
+                    using (var cts = new CancellationTokenSource())
+                    using (cts.Token.Register(() => System.Diagnostics.Debug.Fail($"Seed {generator.Seed} exceeded time limit")))
+                    {
+                        cts.CancelAfter(TimeSpan.FromSeconds(1));
+
+                        var testCase = generator.GenerateCase();
+                        SolveCase(testCase, null);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Assert.Fail($"Failed for seed {seed}\n{ex}");
+                }
+            }
+        }
+
+        [Test, Explicit]
+        public void PerformanceTest()
+        {
             var random = new Random(42);
             const int tests = 50000;
 

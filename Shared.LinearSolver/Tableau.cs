@@ -12,19 +12,19 @@ namespace Shared.LinearSolver
     /// </remarks>
     internal struct Tableau
     {
-        public int VariableCount { get; }
+        public readonly int VariableCount;
         private readonly int firstSurplusVariable;
         public int SurplusVariableCount { get; private set; }
         private readonly int firstArtificialVariable;
         public int ArtificialVariableCount { get; private set; }
-        public int ConstraintCount { get; }
+        public readonly int ConstraintCount;
 
         public int TargetColumn => ColumnCount - 1;
         public int Phase2OptimiseColumn => ColumnCount - 3;
         public int Phase1OptimiseColumn => ColumnCount - 2;
         public int SolveFor => firstSurplusVariable + SurplusVariableCount;
-        public int RowCount => Matrix.GetLength(0);
-        public int ColumnCount => Matrix.GetLength(1);
+        public readonly int RowCount;
+        public readonly int ColumnCount;
         public const int Phase1ObjectiveRow = 0;
         public const int Phase2ObjectiveRow = 1;
         public const int FirstConstraintRow = 2;
@@ -49,14 +49,14 @@ namespace Shared.LinearSolver
 
             IsPhase1 = false;
 
-            var columnCount = 3 + variableCount + constraintCount + constraintCount;
-            var rowCount = 2 + constraintCount;
+            ColumnCount = 3 + variableCount + constraintCount + constraintCount;
+            RowCount = 2 + constraintCount;
 
             Pivots = new ReadSortedPivotList(firstArtificialVariable * ConstraintCount);
 
             // Initialised with zeroes.
-            BasicVariables = new int[rowCount];
-            Matrix = new float[rowCount, columnCount];
+            BasicVariables = new int[RowCount];
+            Matrix = new float[RowCount, ColumnCount];
         }
 
         /// <summary>
@@ -100,24 +100,26 @@ namespace Shared.LinearSolver
 
         public void Reduce()
         {
+            const float minMagnitude = 1;
+            const float maxMagnitude = 8192;
             for (var c = 0; c < RowCount; c++)
             {
                 var min = float.MaxValue;
+                var max = 0f;
                 for (var i = 0; i < ColumnCount; i++)
                 {
-                    //if (!IsPhase1 && IsArtificialVariable(i)) continue;
                     var cell = Matrix[c, i];
                     if (cell == 0) continue;
                     if (cell < 0) cell = -cell;
                     if (cell < min) min = cell;
+                    if (cell > max) max = cell;
                 }
                 // Try to reduce numbers in the target row, without losing (significant) accuracy.
-                if (min > 1 && min != float.MaxValue)
+                if (max > maxMagnitude && min > minMagnitude && min != float.MaxValue)
                 {
                     var reduce = 1 << (int)Math.Log(min, 2);
                     for (var i = 0; i < ColumnCount; i++)
                     {
-                       // if (!IsPhase1 && IsArtificialVariable(i)) continue;
                         Matrix[c, i] /= reduce;
                     }
                 }
