@@ -47,10 +47,12 @@ namespace Shared.LinearSolver
             SurplusVariableCount = 0;
             ArtificialVariableCount = 0;
 
+            IsPhase1 = true;
+            
             var columnCount = 3 + variableCount + constraintCount + constraintCount;
             var rowCount = 2 + constraintCount;
 
-            Pivots = new ReadSortedPivotList(SolveFor * ConstraintCount);
+            Pivots = new ReadSortedPivotList(firstArtificialVariable * ConstraintCount);
 
             // Initialised with zeroes.
             BasicVariables = new int[rowCount];

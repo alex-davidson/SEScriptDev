@@ -13,8 +13,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Constraints\Constraint.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Constraints\ConstraintList.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Constraints\LinearConstraint.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)DebugWriter.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)IDebugWriter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Debug\DebugWriter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Debug\DebugWriterExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Debug\IDebugWriter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MathOp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MatrixOp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pivot.cs" />
@@ -29,6 +30,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Constraints\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Debug\" />
   </ItemGroup>
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)README.md" />
