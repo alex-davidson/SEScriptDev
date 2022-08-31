@@ -7,8 +7,9 @@ namespace Shared.LinearSolver.UnitTests.Debug
     /// </summary>
     internal struct TableauRenderer
     {
-        public string Render(Tableau tableau)
+        public string Render(ref Tableau tableau)
         {
+            var matrix = tableau.Matrix;
             var sb = new StringBuilder();
             sb.Append("".PadLeft(6));
             foreach (var i in tableau.GetActiveColumns())
@@ -33,7 +34,7 @@ namespace Shared.LinearSolver.UnitTests.Debug
 
             string GetCell(int c, int i)
             {
-                var value = tableau.Matrix[c, i];
+                var value = matrix[c, i];
                 var formatted = value.ToString("0.##");
                 return formatted.PadLeft(6);
             }

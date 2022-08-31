@@ -1,5 +1,5 @@
-﻿using System;
-using Shared.LinearSolver.UnitTests.Debug;
+﻿using Shared.LinearSolver.UnitTests.Debug;
+using System;
 
 namespace Shared.LinearSolver
 {
@@ -22,9 +22,9 @@ namespace Shared.LinearSolver
         /// * Used to extract solution values of basic variables.
         /// * Used as per Bland's Rule for choosing pivots.
         /// </remarks>
-        public static float Score(Tableau tableau, int row, int column) => tableau.Matrix[row, tableau.TargetColumn] / tableau.Matrix[row, column];
+        public static float Score(ref Tableau tableau, int row, int column) => tableau.Matrix[row, tableau.TargetColumn] / tableau.Matrix[row, column];
 
-        public static bool MaximiseStep(Tableau tableau, IDebugWriter debugWriter)
+        public static bool MaximiseStep(ref Tableau tableau, IDebugWriter debugWriter)
         {
             tableau.Pivots.Clear();
             // Eliminate each variable from all but one row.
@@ -34,69 +34,69 @@ namespace Shared.LinearSolver
                 var eliminateCoefficient = tableau.Matrix[Tableau.Phase2ObjectiveRow, i];
                 if (eliminateCoefficient >= 0) continue;   // Nothing to eliminate in row 0?
 
-                CollectPivotsForColumn(tableau, i);
+                CollectPivotsForColumn(ref tableau, i);
             }
-            return TryApplyPivot(tableau, debugWriter);
+            return TryApplyPivot(ref tableau, debugWriter);
         }
 
-        public static bool TryApplyPivot(Tableau tableau, IDebugWriter debugWriter)
+        public static bool TryApplyPivot(ref Tableau tableau, IDebugWriter debugWriter)
         {
             foreach (var pivot in tableau.Pivots)
             {
                 debugWriter?.Write($"Candidate: row {tableau.GetRowName(pivot.Row)}, column {tableau.GetVariableName(pivot.Column)}");
-                if (!CheckValidityOfBasicResult(tableau, pivot.Row, pivot.Column, debugWriter)) continue;
-                if (TryPivot(tableau, pivot.Column, pivot.Row, debugWriter)) return true;
+                if (!CheckValidityOfBasicResult(ref tableau, pivot.Row, pivot.Column, debugWriter)) continue;
+                if (TryPivot(ref tableau, pivot.Column, pivot.Row, debugWriter)) return true;
             }
             // Nothing to eliminate?
             return false;
         }
 
-        public static void CollectSolution(Tableau tableau, float[] solution)
+        public static void CollectSolution(ref Tableau tableau, float[] solution)
         {
             for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
                 var basic = tableau.BasicVariables[c];
-                if (basic < tableau.VariableCount) TryGetBasicSolution(tableau, basic, out solution[basic]);
+                if (basic < tableau.VariableCount) TryGetBasicSolution(ref tableau, basic, out solution[basic]);
             }
         }
 
-        public static bool TryPivot(Tableau tableau, int enteringColumn, int leavingRow, IDebugWriter debugWriter)
+        public static bool TryPivot(ref Tableau tableau, int enteringColumn, int leavingRow, IDebugWriter debugWriter)
         {
             var leavingColumn = tableau.BasicVariables[leavingRow];
             if (leavingColumn == enteringColumn) throw new InvalidOperationException("Entering and leaving variables must be different.");
 
-            debugWriter?.WritePivot(tableau, leavingRow, enteringColumn);
+            debugWriter?.WritePivot(ref tableau, leavingRow, enteringColumn);
             MatrixOp.Pivot(tableau.Matrix, enteringColumn, leavingRow);
 
             tableau.BasicVariables[leavingRow] = enteringColumn;
             return true;
         }
 
-        private static void CollectPivotsForColumn(Tableau tableau, int pivotColumn)
+        private static void CollectPivotsForColumn(ref Tableau tableau, int pivotColumn)
         {
             for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
                 if (tableau.Matrix[c, pivotColumn] == 0) continue;
                 if (tableau.BasicVariables[c] == pivotColumn) continue; // Cannot pivot a variable on itself.
-                var candidate = Score(tableau, c, pivotColumn);
+                var candidate = Score(ref tableau, c, pivotColumn);
                 if (candidate <= 0) continue;
                 tableau.Pivots.Add(new Pivot(c, pivotColumn), candidate);
             }
         }
 
-        public static void CollectPivotsForRow(Tableau tableau, int pivotRow)
+        public static void CollectPivotsForRow(ref Tableau tableau, int pivotRow)
         {
             for (var i = 0; i < tableau.SolveFor; i++)
             {
                 if (tableau.Matrix[pivotRow, i] == 0) continue;
                 if (tableau.BasicVariables[pivotRow] == i) continue; // Cannot pivot a variable on itself.
-                var candidate = Score(tableau, pivotRow, i);
+                var candidate = Score(ref tableau, pivotRow, i);
                 if (candidate <= 0) continue;
                 tableau.Pivots.Add(new Pivot(pivotRow, i), candidate);
             }
         }
 
-        private static bool CheckValidityOfBasicResult(Tableau tableau, int pivotRow, int pivotColumn, IDebugWriter debugWriter)
+        private static bool CheckValidityOfBasicResult(ref Tableau tableau, int pivotRow, int pivotColumn, IDebugWriter debugWriter)
         {
             var pivotCoefficient = tableau.Matrix[pivotRow, pivotColumn];
             for (var targetRow = Tableau.FirstConstraintRow; targetRow < tableau.RowCount; targetRow++)
@@ -121,7 +121,7 @@ namespace Shared.LinearSolver
             return true;
         }
 
-        public static bool TryGetBasicSolution(Tableau tableau, int variable, out float value)
+        public static bool TryGetBasicSolution(ref Tableau tableau, int variable, out float value)
         {
             value = 0;
             if (tableau.Matrix[tableau.ObjectiveRow, variable] != 0) return false;
@@ -130,7 +130,7 @@ namespace Shared.LinearSolver
             for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
                 if (tableau.Matrix[c, variable] == 0) continue;
-                value = Score(tableau, c, variable);
+                value = Score(ref tableau, c, variable);
                 if (alreadyGotValue)
                 {
                     // Should have only one possible value if this is a basic variable?

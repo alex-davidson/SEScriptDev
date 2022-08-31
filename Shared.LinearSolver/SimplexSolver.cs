@@ -26,9 +26,9 @@ namespace Shared.LinearSolver
             tableau.Matrix[Tableau.Phase2ObjectiveRow, tableau.Phase2OptimiseColumn] = 1;
             for (var i = 0; i < coefficients.Length; i++) tableau.Matrix[Tableau.Phase2ObjectiveRow, i] = -coefficients[i];
 
-            SetupConstraints(tableau, constraints);
+            SetupConstraints(ref tableau, constraints);
 
-            return Solve(tableau);
+            return Solve(ref tableau);
         }
 
         public Solution Minimise(params float[] coefficients)
@@ -40,28 +40,28 @@ namespace Shared.LinearSolver
             tableau.Matrix[Tableau.Phase2ObjectiveRow, tableau.Phase2OptimiseColumn] = -1;
             for (var i = 0; i < coefficients.Length; i++) tableau.Matrix[Tableau.Phase2ObjectiveRow, i] = coefficients[i];
 
-            SetupConstraints(tableau, constraints);
+            SetupConstraints(ref tableau, constraints);
 
-            return Solve(tableau);
+            return Solve(ref tableau);
         }
 
-        private Solution Solve(Tableau tableau)
+        private Solution Solve(ref Tableau tableau)
         {
-            if (!DoPhase1(tableau)) return new Solution { Result = SimplexResult.NoSolution };
+            if (!DoPhase1(ref tableau)) return new Solution { Result = SimplexResult.NoSolution };
 
-            debug?.Write("Phase 2, start", tableau);
+            debug?.Write("Phase 2, start", ref tableau);
 
-            while (SimplexOp.MaximiseStep(tableau, debug))
+            while (SimplexOp.MaximiseStep(ref tableau, debug))
             {
-                debug?.Write("Phase 2, step", tableau);
+                debug?.Write("Phase 2, step", ref tableau);
             }
 
             debug?.Write("Phase 2, end");
 
-            return ExtractSolution(tableau);
+            return ExtractSolution(ref tableau);
         }
 
-        private static void SetupConstraints(Tableau tableau, ConstraintList constraints)
+        private static void SetupConstraints(ref Tableau tableau, ConstraintList constraints)
         {
             for (var c = 0; c < constraints.Count; c++)
             {
@@ -104,7 +104,7 @@ namespace Shared.LinearSolver
         /// <summary>
         /// Given an optimised tableau, extract the variables' values.
         /// </summary>
-        private Solution ExtractSolution(Tableau tableau)
+        private Solution ExtractSolution(ref Tableau tableau)
         {
             var result = SimplexResult.OptimalSolution;
             for (var i = 0; i < tableau.SolveFor; i++)
@@ -121,23 +121,23 @@ namespace Shared.LinearSolver
             }
 
             var solution = new float[tableau.VariableCount];
-            SimplexOp.CollectSolution(tableau, solution);
+            SimplexOp.CollectSolution(ref tableau, solution);
 
             return new Solution
             {
                 Result = result,
                 Values = solution,
-                Optimised = SimplexOp.Score(tableau, Tableau.Phase2ObjectiveRow, tableau.Phase2OptimiseColumn),
+                Optimised = SimplexOp.Score(ref tableau, Tableau.Phase2ObjectiveRow, tableau.Phase2OptimiseColumn),
             };
         }
 
-        private bool DoPhase1(Tableau tableau)
+        private bool DoPhase1(ref Tableau tableau)
         {
             if (tableau.ArtificialVariableCount <= 0) return true;
 
             tableau.BeginPhase1();
 
-            debug?.Write("Phase 1, start", tableau);
+            debug?.Write("Phase 1, start", ref tableau);
 
             for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
@@ -146,7 +146,7 @@ namespace Shared.LinearSolver
                 MatrixOp.SubtractRow(tableau.Matrix, Tableau.Phase1ObjectiveRow, c);
             }
 
-            debug?.Write("Phase 1, prep", tableau);
+            debug?.Write("Phase 1, prep", ref tableau);
 
             var remainingArtificialVariables = tableau.ArtificialVariableCount;
             while (remainingArtificialVariables > 0)
@@ -155,10 +155,10 @@ namespace Shared.LinearSolver
                 for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
                 {
                     if (!tableau.IsArtificialVariable(tableau.BasicVariables[c])) continue;
-                    SimplexOp.CollectPivotsForRow(tableau, c);
+                    SimplexOp.CollectPivotsForRow(ref tableau, c);
                 }
-                if (!SimplexOp.TryApplyPivot(tableau, debug)) return false;
-                debug?.Write("Phase 1, step", tableau);
+                if (!SimplexOp.TryApplyPivot(ref tableau, debug)) return false;
+                debug?.Write("Phase 1, step", ref tableau);
                 remainingArtificialVariables--;
             }
 
