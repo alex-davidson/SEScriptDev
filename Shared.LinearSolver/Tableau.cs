@@ -10,7 +10,7 @@ namespace Shared.LinearSolver
     /// A float[y+2,x+3] matrix of coefficients, where y is the number of constraints and x is the total number
     /// of variables (including slack/surplus and artificial).
     /// </remarks>
-    public class Tableau
+    internal class Tableau
     {
         public int VariableCount { get; }
         private readonly int firstSurplusVariable;
@@ -47,8 +47,8 @@ namespace Shared.LinearSolver
             SurplusVariableCount = 0;
             ArtificialVariableCount = 0;
 
-            IsPhase1 = true;
-            
+            IsPhase1 = false;
+
             var columnCount = 3 + variableCount + constraintCount + constraintCount;
             var rowCount = 2 + constraintCount;
 

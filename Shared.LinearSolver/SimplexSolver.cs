@@ -1,16 +1,17 @@
 ﻿using System;
+using Shared.LinearSolver.Constraints;
 using Shared.LinearSolver.UnitTests.Debug;
 
 namespace Shared.LinearSolver
 {
     public struct SimplexSolver
     {
-        private readonly Constraints.ConstraintList constraints;
+        private readonly ConstraintList constraints;
         private readonly IDebugWriter debug;
 
-        public static SimplexSolver Given(Constraints.ConstraintList constraints, IDebugWriter debug = null) => new SimplexSolver(constraints, debug);
+        public static SimplexSolver Given(ConstraintList constraints, IDebugWriter debug = null) => new SimplexSolver(constraints, debug);
 
-        private SimplexSolver(Constraints.ConstraintList constraints, IDebugWriter debug = null)
+        private SimplexSolver(ConstraintList constraints, IDebugWriter debug = null)
         {
             this.constraints = constraints;
             this.debug = debug;
@@ -18,18 +19,28 @@ namespace Shared.LinearSolver
 
         public Solution Maximise(params float[] coefficients)
         {
-            var builder = new TableauBuilder(constraints, coefficients);
+            var variableCount = Math.Max(coefficients.Length, constraints.VariableCount);
+            var tableau = new Tableau(variableCount, constraints.Count);
 
-            var tableau = builder.ForMaximise();
+            tableau.Matrix[Tableau.Phase1ObjectiveRow, tableau.Phase1OptimiseColumn] = 1;
+            tableau.Matrix[Tableau.Phase2ObjectiveRow, tableau.Phase2OptimiseColumn] = 1;
+            for (var i = 0; i < coefficients.Length; i++) tableau.Matrix[Tableau.Phase2ObjectiveRow, i] = -coefficients[i];
+
+            SetupConstraints(tableau, constraints);
 
             return Solve(tableau);
         }
 
         public Solution Minimise(params float[] coefficients)
         {
-            var builder = new TableauBuilder(constraints, coefficients);
+            var variableCount = Math.Max(coefficients.Length, constraints.VariableCount);
+            var tableau = new Tableau(variableCount, constraints.Count);
 
-            var tableau = builder.ForMinimise();
+            tableau.Matrix[Tableau.Phase1ObjectiveRow, tableau.Phase1OptimiseColumn] = 1;
+            tableau.Matrix[Tableau.Phase2ObjectiveRow, tableau.Phase2OptimiseColumn] = -1;
+            for (var i = 0; i < coefficients.Length; i++) tableau.Matrix[Tableau.Phase2ObjectiveRow, i] = coefficients[i];
+
+            SetupConstraints(tableau, constraints);
 
             return Solve(tableau);
         }
@@ -48,6 +59,46 @@ namespace Shared.LinearSolver
             debug?.Write("Phase 2, end");
 
             return ExtractSolution(tableau);
+        }
+
+        private static void SetupConstraints(Tableau tableau, ConstraintList constraints)
+        {
+            for (var c = 0; c < constraints.Count; c++)
+            {
+                var constraint = Normalise(constraints[c]);
+                // Populate coefficients for variables.
+                for (var i = 0; i < constraint.Coefficients.Length; i++) tableau.Matrix[c + Tableau.FirstConstraintRow, i] = constraint.Coefficients[i];
+                // Populate surplus variable coefficient if necessary.
+                if (constraint.SurplusCoefficient != 0)
+                {
+                    var surplusIndex = tableau.AddSurplusVariable();
+                    tableau.Matrix[c + Tableau.FirstConstraintRow, surplusIndex] = constraint.SurplusCoefficient;
+                    tableau.BasicVariables[c + Tableau.FirstConstraintRow] = surplusIndex;
+                }
+                if (constraint.SurplusCoefficient <= 0)
+                {
+                    var artificialIndex = tableau.AddArtificialVariable();
+                    tableau.Matrix[c + Tableau.FirstConstraintRow, artificialIndex] = 1;
+                    tableau.BasicVariables[c + Tableau.FirstConstraintRow] = artificialIndex;
+                    tableau.Matrix[Tableau.Phase1ObjectiveRow, artificialIndex] = 1;
+                }
+
+                // Populate target.
+                tableau.Matrix[c + Tableau.FirstConstraintRow, tableau.TargetColumn] = constraint.Target;
+            }
+        }
+
+        private static Constraint Normalise(Constraint constraint)
+        {
+            if (constraint.Target >= 0) return constraint;
+            var coefficients = new float[constraint.Coefficients.Length];
+            for (var i = 0; i < coefficients.Length; i++) coefficients[i] = -constraint.Coefficients[i];
+            return new Constraint
+            {
+                Coefficients = coefficients,
+                SurplusCoefficient = -constraint.SurplusCoefficient,
+                Target = -constraint.Target,
+            };
         }
 
         /// <summary>
