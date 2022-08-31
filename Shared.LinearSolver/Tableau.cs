@@ -32,6 +32,9 @@ namespace Shared.LinearSolver
         public bool IsPhase1 { get; private set; }
         public int ObjectiveRow => IsPhase1 ? Phase1ObjectiveRow : Phase2ObjectiveRow;
 
+        public BitSet Columns;
+        public BitSet Rows;
+
         public Tableau(int variableCount, int constraintCount)
         {
             if (constraintCount < 1) throw new ArgumentException("Must have at least one constraint.");
@@ -52,11 +55,27 @@ namespace Shared.LinearSolver
             var columnCount = 3 + variableCount + constraintCount + constraintCount;
             var rowCount = 2 + constraintCount;
 
+            Columns = new BitSet(columnCount);
+            Rows = new BitSet(rowCount);
+
             Pivots = new ReadSortedPivotList(firstArtificialVariable * ConstraintCount);
 
             // Initialised with zeroes.
             BasicVariables = new int[rowCount];
             Matrix = new float[rowCount, columnCount];
+
+            for (var i = 0; i < variableCount; i++)
+            {
+                Columns.Add(i);
+            }
+            Columns.Add(TargetColumn);
+            Columns.Add(Phase2OptimiseColumn);
+
+            for (int i = 0, j = FirstConstraintRow; i < constraintCount; i++, j++)
+            {
+                Rows.Add(j);
+            }
+            Rows.Add(Phase2ObjectiveRow);
         }
 
         /// <summary>
@@ -82,6 +101,7 @@ namespace Shared.LinearSolver
             if (SurplusVariableCount >= ConstraintCount) throw new InvalidOperationException("Already at limit of slack/surplus variables.");
             var index = firstSurplusVariable + SurplusVariableCount;
             SurplusVariableCount++;
+            Columns.Add(index);
             return index;
         }
 
@@ -90,13 +110,28 @@ namespace Shared.LinearSolver
             if (ArtificialVariableCount >= ConstraintCount) throw new InvalidOperationException("Already at limit of artificial variables.");
             var index = firstArtificialVariable + ArtificialVariableCount;
             ArtificialVariableCount++;
+            Columns.Add(index);
             return index;
         }
 
         public bool IsArtificialVariable(int index) => index >= firstArtificialVariable;
 
-        public void BeginPhase1() { IsPhase1 = true; }
-        public void EndPhase1() { IsPhase1 = false; }
+        public void BeginPhase1()
+        {
+            Columns.Add(Phase1OptimiseColumn);
+            Rows.Add(Phase1ObjectiveRow);
+            IsPhase1 = true;
+        }
+        public void EndPhase1()
+        {
+            for (int i = 0, j = firstArtificialVariable; i < ArtificialVariableCount; i++, j++)
+            {
+                Columns.Remove(j);
+            }
+            Columns.Remove(Phase1OptimiseColumn);
+            Rows.Remove(Phase1ObjectiveRow);
+            IsPhase1 = false;
+        }
 
         internal string GetRowName(int c)
         {
@@ -118,21 +153,8 @@ namespace Shared.LinearSolver
             return "ERR";
         }
 
-        public IEnumerable<int> GetActiveRows()
-        {
-            if (IsPhase1) yield return Phase1ObjectiveRow;
-            yield return Phase2ObjectiveRow;
-            for (var i = FirstConstraintRow; i < RowCount; i++) yield return i;
-        }
+        public IEnumerable<int> GetActiveRows() => Rows;
 
-        public IEnumerable<int> GetActiveColumns()
-        {
-            for (var i = 0; i < VariableCount; i++) yield return i;
-            for (int i = 0, j = firstSurplusVariable; i < SurplusVariableCount; i++, j++) yield return j;
-            if (IsPhase1) for (int i = 0, j = firstArtificialVariable; i < ArtificialVariableCount; i++, j++) yield return j;
-            yield return Phase2OptimiseColumn;
-            if (IsPhase1) yield return Phase1OptimiseColumn;
-            yield return TargetColumn;
-        }
+        public IEnumerable<int> GetActiveColumns() => Columns;
     }
 }

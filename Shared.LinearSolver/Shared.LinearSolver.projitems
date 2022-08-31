@@ -9,6 +9,8 @@
     <Import_RootNamespace>Shared.LinearSolver</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)BitSet.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)BitSetIterator.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Constraints\Constrain.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Constraints\Constraint.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Constraints\ConstraintList.cs" />
