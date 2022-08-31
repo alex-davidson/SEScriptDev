@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using NUnit.Framework;
 using Shared.LinearSolver.Constraints;
+using Shared.LinearSolver.UnitTests.Debug;
 
 namespace Shared.LinearSolver.UnitTests
 {

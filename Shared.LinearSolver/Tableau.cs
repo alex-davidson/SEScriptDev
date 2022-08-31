@@ -47,6 +47,8 @@ namespace Shared.LinearSolver
             SurplusVariableCount = 0;
             ArtificialVariableCount = 0;
 
+            IsPhase1 = true;
+
             ColumnCount = 3 + variableCount + constraintCount + constraintCount;
             RowCount = 2 + constraintCount;
 

@@ -1,4 +1,6 @@
-﻿namespace Shared.LinearSolver
+using Shared.LinearSolver.UnitTests.Debug;
+
+namespace Shared.LinearSolver
 {
     public struct SimplexSolver
     {
@@ -19,18 +21,7 @@
 
             var tableau = builder.ForMaximise();
 
-            if (!DoPhase1(tableau)) return new Solution { Result = SimplexResult.NoSolution };
-
-            debug?.Write("Phase 2, start", tableau);
-
-            while (SimplexOp.MaximiseStep(tableau, debug))
-            {
-                debug?.Write("Phase 2, step", tableau);
-            }
-
-            debug?.Write("Phase 2, end");
-
-            return ExtractSolution(tableau);
+            return Solve(tableau);
         }
 
         public Solution Minimise(params float[] coefficients)
@@ -39,6 +30,11 @@
 
             var tableau = builder.ForMinimise();
 
+            return Solve(tableau);
+        }
+
+        private Solution Solve(Tableau tableau)
+        {
             if (!DoPhase1(tableau)) return new Solution { Result = SimplexResult.NoSolution };
 
             debug?.Write("Phase 2, start", tableau);

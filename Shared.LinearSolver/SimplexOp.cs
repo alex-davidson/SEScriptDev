@@ -1,4 +1,5 @@
 ﻿using System;
+using Shared.LinearSolver.UnitTests.Debug;
 
 namespace Shared.LinearSolver
 {
