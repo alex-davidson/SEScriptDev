@@ -67,8 +67,9 @@ namespace Shared.LinearSolver
 
             debugWriter?.WritePivot(ref tableau, leavingRow, enteringColumn);
             MatrixOp.Pivot(tableau.Matrix, enteringColumn, leavingRow);
-
             tableau.BasicVariables[leavingRow] = enteringColumn;
+
+            tableau.Reduce();
             return true;
         }
 

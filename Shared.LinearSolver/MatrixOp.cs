@@ -26,26 +26,12 @@ namespace Shared.LinearSolver
                 var eliminateCoefficient = matrix[targetRow, pivotColumn];
                 if (eliminateCoefficient == 0) continue;  // Nothing to eliminate?
 
-                var min = float.MaxValue;
                 for (var i = 0; i < columns; i++)
                 {
                     // Warning: values can grow large through many eliminations. Might need to rescale periodically.
-                    var cell = (matrix[targetRow, i] * pivotCoefficient) - (matrix[pivotRow, i] * eliminateCoefficient);
-                    matrix[targetRow, i] = cell;
-                    if (cell == 0) continue;
-                    if (cell < 0) cell = -cell;
-                    if (cell < min) min = cell;
+                    matrix[targetRow, i] = (matrix[targetRow, i] * pivotCoefficient) - (matrix[pivotRow, i] * eliminateCoefficient);
                     // Alternative, doesn't suffer from sign problems but does introduce rounding errors:
                     // matrix[targetRow, i] = matrix[targetRow, i] - (matrix[pivotRow, i] * eliminateCoefficient / pivotCoefficient);
-                }
-                // Try to reduce numbers in the target row, without losing (significant) accuracy.
-                if (min > 1 && min != float.MaxValue)
-                {
-                    var reduce = 1 << (int)Math.Log(min, 2);
-                    for (var i = 0; i < columns; i++)
-                    {
-                        matrix[targetRow, i] /= reduce;
-                    }
                 }
                 // Should have cancelled out. Set it to 0 directly just in case.
                 matrix[targetRow, pivotColumn] = 0;

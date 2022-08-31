@@ -93,10 +93,36 @@ namespace Shared.LinearSolver
             return index;
         }
 
-        public bool IsArtificialVariable(int index) => index >= firstArtificialVariable;
+        public bool IsArtificialVariable(int index) => index >= firstArtificialVariable && index < Phase2OptimiseColumn;
 
         public void BeginPhase1() { IsPhase1 = true; }
         public void EndPhase1() { IsPhase1 = false; }
+
+        public void Reduce()
+        {
+            for (var c = 0; c < RowCount; c++)
+            {
+                var min = float.MaxValue;
+                for (var i = 0; i < ColumnCount; i++)
+                {
+                    //if (!IsPhase1 && IsArtificialVariable(i)) continue;
+                    var cell = Matrix[c, i];
+                    if (cell == 0) continue;
+                    if (cell < 0) cell = -cell;
+                    if (cell < min) min = cell;
+                }
+                // Try to reduce numbers in the target row, without losing (significant) accuracy.
+                if (min > 1 && min != float.MaxValue)
+                {
+                    var reduce = 1 << (int)Math.Log(min, 2);
+                    for (var i = 0; i < ColumnCount; i++)
+                    {
+                       // if (!IsPhase1 && IsArtificialVariable(i)) continue;
+                        Matrix[c, i] /= reduce;
+                    }
+                }
+            }
+        }
 
         internal string GetRowName(int c)
         {
