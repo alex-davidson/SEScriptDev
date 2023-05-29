@@ -65,11 +65,11 @@
             }
 
             var solution = new float[tableau.VariableCount];
-            SimplexOp.CollectSolution(tableau, solution);
+            var type = SimplexOp.CollectSolution(tableau, solution);
 
             return new Solution
             {
-                Result = SimplexResult.OptimalSolution,
+                Result = type == BasicSolutionType.NotUnique ? SimplexResult.OptimalSolutionNotUnique : SimplexResult.OptimalSolution,
                 Values = solution,
                 Optimised = SimplexOp.Score(tableau, Tableau.Phase2ObjectiveRow, tableau.Phase2OptimiseColumn),
             };

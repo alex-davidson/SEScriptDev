@@ -302,6 +302,78 @@ namespace Shared.LinearSolver.UnitTests
                     Result = SimplexResult.OptimalSolution,
                 },
             },
+            // Simple case, maximise
+            new Case
+            {
+                Constraints =
+                {
+                    Constrain.Linear(-1, 1).LessThanOrEqualTo(0),   // x >= y
+                    Constrain.Linear(1, 0).LessThanOrEqualTo(80),   // x <= 80
+                    Constrain.Linear(0, 1).LessThanOrEqualTo(15),   // y <= 15
+                },
+                Maximise = { 1, 1 },   // max x+y
+                Expected = new Solution
+                {
+                    Values = new float[] { 80, 15 },
+                    Optimised = 95,
+                    Result = SimplexResult.OptimalSolution,
+                },
+            },
+            // Simple case, maximise
+            new Case
+            {
+                Constraints =
+                {
+                    Constrain.Linear(-1, 1).EqualTo(0),             // x == y
+                    Constrain.Linear(1, 0).LessThanOrEqualTo(80),   // x <= 80
+                    Constrain.Linear(0, 1).LessThanOrEqualTo(15),   // y <= 15
+                },
+                Maximise = { 1, 1 },   // max x+y
+                Expected = new Solution
+                {
+                    Values = new float[] { 15, 15 },
+                    Optimised = 30,
+                    Result = SimplexResult.OptimalSolution,
+                },
+            },
+            // Simple case, maximise
+            new Case
+            {
+                Constraints =
+                {
+                    Constrain.Linear(1, -1).LessThanOrEqualTo(0),   // x <= y
+                    Constrain.Linear(1, 0).LessThanOrEqualTo(90),   // x <= 90
+                    Constrain.Linear(0, 1).LessThanOrEqualTo(120),  // y <= 120
+                },
+                Maximise = { 0, 1 },   // max y
+                Expected = new Solution
+                {
+                    Values = new float[] { 0, 120 },
+                    Optimised = 120,
+                    Result = SimplexResult.OptimalSolution,
+                },
+            },
+            // Complex case, maximise
+            new Case
+            {
+                // 6 variables
+                Constraints =
+                {
+                    Constrain.Linear(1, 1, 0, 0, 0, 0).LessThanOrEqualTo(90),
+                    Constrain.Linear(0, 0, 0, 1, 0, 0).LessThanOrEqualTo(90),
+                    Constrain.Linear(0, 0, 1, 0, 1, 0).LessThanOrEqualTo(60),
+                    Constrain.Linear(0, 0, 0, 0, 0, 1).LessThanOrEqualTo(120),
+                    Constrain.Linear(1, 0, -1, 0, 0, 0).LessThanOrEqualTo(0),
+                    Constrain.Linear(0, 1, 0, 1, -1, -1).LessThanOrEqualTo(0),
+                },
+                Maximise = { 1, 1, 1, 1, 1, 1 },   // max all
+                Expected = new Solution
+                {
+                    Values = new float[] { 60, 30, 60, 90, 0, 120 },
+                    Optimised = 360,
+                    Result = SimplexResult.OptimalSolution,
+                },
+            },
         };
 
         private IDebugWriter Debug => new DebugWriter(TestContext.WriteLine);

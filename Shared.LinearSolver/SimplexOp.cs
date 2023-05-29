@@ -39,12 +39,17 @@ namespace Shared.LinearSolver
             return false;
         }
 
-        public static void CollectSolution(Tableau tableau, float[] solution)
+        public static BasicSolutionType CollectSolution(Tableau tableau, float[] solution)
         {
+            var type = BasicSolutionType.Unique;
             for (var i = 0; i < tableau.VariableCount; i++)
             {
-                TryGetBasicSolution(tableau, i, out solution[i]);
+                if (TryGetBasicSolution(tableau, i, out solution[i]) == BasicSolutionType.NotUnique)
+                {
+                    type = BasicSolutionType.NotUnique;
+                }
             }
+            return type;
         }
 
         public static bool TryPivot(Tableau tableau, int enteringColumn, int leavingRow, IDebugWriter debugWriter)
@@ -69,9 +74,10 @@ namespace Shared.LinearSolver
                 if (tableau.Matrix[c, pivotColumn] == 0) continue;
                 if (tableau.BasicVariables[c] == pivotColumn) continue; // Cannot pivot a variable on itself.
                 var candidate = Score(tableau, c, pivotColumn);
-                debugWriter?.Write($"Candidate row: {tableau.GetRowName(c)} = {candidate}");
+                debugWriter?.Write($"Candidate row: {tableau.GetRowName(c)} = {candidate} (pivot {tableau.Matrix[c, pivotColumn]})");
 
-                if (candidate <= 0) continue;
+                // We don't care whether the candidate score is positive, only that the pivot coefficient is.
+                if (tableau.Matrix[c, pivotColumn] < 0) continue;
                 if (candidate >= best) continue;
                 if (!CheckValidityOfBasicResult(tableau, c, pivotColumn, debugWriter)) continue;
 
@@ -90,9 +96,10 @@ namespace Shared.LinearSolver
                 if (tableau.Matrix[pivotRow, i] == 0) continue;
                 if (tableau.BasicVariables[pivotRow] == i) continue; // Cannot pivot a variable on itself.
                 var candidate = Score(tableau, pivotRow, i);
-                debugWriter?.Write($"Candidate column: {tableau.GetVariableName(i)} = {candidate}");
+                debugWriter?.Write($"Candidate column: {tableau.GetVariableName(i)} = {candidate} (pivot {tableau.Matrix[pivotRow, i]})");
 
-                if (candidate <= 0) continue;
+                // We don't care whether the candidate score is positive, only that the pivot coefficient is.
+                if (tableau.Matrix[pivotRow, i] < 0) continue;
                 if (candidate >= best) continue;
                 if (!CheckValidityOfBasicResult(tableau, pivotRow, i, debugWriter)) continue;
 
@@ -127,24 +134,28 @@ namespace Shared.LinearSolver
             return true;
         }
 
-        public static bool TryGetBasicSolution(Tableau tableau, int variable, out float value)
+        public static BasicSolutionType TryGetBasicSolution(Tableau tableau, int variable, out float value)
         {
             value = 0;
-            if (tableau.Matrix[tableau.ObjectiveRow, variable] != 0) return false;
+            if (tableau.Matrix[tableau.ObjectiveRow, variable] != 0) return BasicSolutionType.NonBasicVariable;
+            if (Array.IndexOf(tableau.BasicVariables, variable, Tableau.FirstConstraintRow) < 0) return BasicSolutionType.NonBasicVariable;
 
             var alreadyGotValue = false;
             for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
                 if (tableau.Matrix[c, variable] == 0) continue;
                 value = Score(tableau, c, variable);
-                if (alreadyGotValue)
-                {
-                    // Should have only one possible value if this is a basic variable?
-                    throw new InvalidOperationException($"No unique solution: {variable}");
-                }
+                if (alreadyGotValue) return BasicSolutionType.NotUnique;
                 alreadyGotValue = true;
             }
-            return true;
+            return BasicSolutionType.Unique;
         }
+    }
+
+    public enum BasicSolutionType
+    {
+        Unique,
+        NotUnique,
+        NonBasicVariable,
     }
 }

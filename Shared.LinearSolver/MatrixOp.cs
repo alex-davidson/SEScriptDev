@@ -15,7 +15,7 @@ namespace Shared.LinearSolver
             // If the pivot coefficient is negative then we'll end up negating the entire target row.
             // The sign of the coefficients is significant to the Simplex algorithm, so this would be a problem.
             // SHOULD NOT HAPPEN?
-            if (pivotCoefficient < 0) throw new InvalidOperationException("Did not expect pivot coefficient to be negative.");
+            if (pivotCoefficient < 0) throw new InvalidOperationException($"Did not expect pivot coefficient to be negative: {pivotCoefficient}");
 
             for (var targetRow = 0; targetRow < matrix.GetLength(0); targetRow++)
             {

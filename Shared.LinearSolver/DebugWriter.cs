@@ -23,13 +23,20 @@ namespace Shared.LinearSolver
                 var basic = tableau.BasicVariables[c];
                 sb.Append(tableau.GetVariableName(basic));
                 sb.Append(" = ");
-                if (SimplexOp.TryGetBasicSolution(tableau, basic, out var value))
+                switch (SimplexOp.TryGetBasicSolution(tableau, basic, out var value))
                 {
-                    sb.Append(value);
-                }
-                else
-                {
-                    sb.Append("***");
+                    case BasicSolutionType.Unique:
+                        sb.Append(value);
+                        break;
+
+                    case BasicSolutionType.NotUnique:
+                        sb.Append(value);
+                        sb.Append("?");
+                        break;
+
+                    case BasicSolutionType.NonBasicVariable:
+                        sb.Append("***");
+                        break;
                 }
                 sb.Append("    ");
             }
