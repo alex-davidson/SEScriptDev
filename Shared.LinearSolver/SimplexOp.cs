@@ -69,7 +69,7 @@ namespace Shared.LinearSolver
                 if (tableau.Matrix[c, pivotColumn] == 0) continue;
                 if (tableau.BasicVariables[c] == pivotColumn) continue; // Cannot pivot a variable on itself.
                 var candidate = Score(tableau, c, pivotColumn);
-                debugWriter.Write($"Candidate row: {tableau.GetRowName(c)} = {candidate}");
+                debugWriter?.Write($"Candidate row: {tableau.GetRowName(c)} = {candidate}");
 
                 if (candidate <= 0) continue;
                 if (candidate >= best) continue;
@@ -90,7 +90,7 @@ namespace Shared.LinearSolver
                 if (tableau.Matrix[pivotRow, i] == 0) continue;
                 if (tableau.BasicVariables[pivotRow] == i) continue; // Cannot pivot a variable on itself.
                 var candidate = Score(tableau, pivotRow, i);
-                debugWriter.Write($"Candidate column: {tableau.GetVariableName(i)} = {candidate}");
+                debugWriter?.Write($"Candidate column: {tableau.GetVariableName(i)} = {candidate}");
 
                 if (candidate <= 0) continue;
                 if (candidate >= best) continue;
@@ -120,7 +120,7 @@ namespace Shared.LinearSolver
                 // We only care about the sign of the Score, not the actual value, so use multiplication instead of division here.
                 if (postPivotValue * postPivotTarget < 0)
                 {
-                    debugWriter.Write($"  Invalid: would leave {tableau.GetVariableName(i)} negative");
+                    debugWriter?.Write($"  Invalid: would leave {tableau.GetVariableName(i)} negative");
                     return false;
                 }
             }
