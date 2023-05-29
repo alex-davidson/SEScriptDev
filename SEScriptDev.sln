@@ -37,6 +37,8 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared.LinearSolver", "Shar
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.LinearSolver.UnitTests", "Shared.LinearSolver.UnitTests\Shared.LinearSolver.UnitTests.csproj", "{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LinearSolver.Package", "LinearSolver.Package\LinearSolver.Package.csproj", "{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}"
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{0cff3a23-46e4-439a-95db-1bf40f95ae72}*SharedItemsImports = 4
@@ -46,6 +48,7 @@ Global
 		Shared.Testing\Shared.Testing.projitems*{1dae0091-80af-41f4-b381-3225cdf5b4cd}*SharedItemsImports = 4
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{24954313-b442-47f5-886e-f020c205fca5}*SharedItemsImports = 4
 		Shared.Core\Shared.Core.projitems*{24954313-b442-47f5-886e-f020c205fca5}*SharedItemsImports = 4
+		Shared.LinearSolver\Shared.LinearSolver.projitems*{2ea3ec08-3a76-4262-aa49-fccee14739a4}*SharedItemsImports = 5
 		Shared.LinearSolver\Shared.LinearSolver.projitems*{476ebd47-0a65-4bd8-ba09-0b686e0e022b}*SharedItemsImports = 13
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{6219a884-20ea-4f5f-9810-c1dec259dc74}*SharedItemsImports = 4
 		Shared.Core\Shared.Core.projitems*{6219a884-20ea-4f5f-9810-c1dec259dc74}*SharedItemsImports = 4
@@ -173,6 +176,14 @@ Global
 		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Release|Any CPU.Build.0 = Release|Any CPU
 		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Release|x64.ActiveCfg = Release|Any CPU
 		{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}.Release|x64.Build.0 = Release|Any CPU
+		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Debug|Any CPU.Build.0 = Release|Any CPU
+		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Debug|x64.Build.0 = Debug|Any CPU
+		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Release|x64.ActiveCfg = Release|Any CPU
+		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

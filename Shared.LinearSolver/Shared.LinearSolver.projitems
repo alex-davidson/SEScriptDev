@@ -28,7 +28,7 @@
     <Folder Include="$(MSBuildThisFileDirectory)Constraints\" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)README.md" />
+    <Content Include="$(MSBuildThisFileDirectory)README.md" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="$(MSBuildThisFileDirectory)Documentation\Simplex.md" />
