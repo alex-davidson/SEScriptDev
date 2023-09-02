@@ -19,11 +19,21 @@ namespace Shared.LinearSolver.UnitTests
         }
 
         [Test]
-        public void Exponent()
+        public void Log2Floor()
         {
-            double value = 10000;
-            var bits = BitConverter.DoubleToInt64Bits(value);
+            var random = new Random(42);
+            var cases = new float[500000];
+            for (var i = 0; i < cases.Length; i++)
+            {
+                cases[i] = (float)random.NextDouble() * float.MaxValue;
+            }
 
+            foreach (var value in cases)
+            {
+                var reference = MathOp.Log2FloorReference(value);
+                var opt = MathOp.Log2Floor(value);
+                Assert.That(opt, Is.EqualTo(reference));
+            }
         }
     }
 }

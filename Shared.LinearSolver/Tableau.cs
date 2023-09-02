@@ -110,13 +110,14 @@ namespace Shared.LinearSolver
                     if (cell > max) max = cell;
                 }
                 // Try to reduce numbers in the target row, without losing (significant) accuracy.
-                if (max > maxMagnitude && min > minMagnitude && min != float.MaxValue)
+                // if (min == float.MaxValue) continue;
+                if (max <= maxMagnitude) continue;
+                if (min <= minMagnitude) continue;
+
+                var reduce = 1f / (1 << MathOp.Log2Floor(min));
+                for (var i = 0; i<ColumnCount; i++)
                 {
-                    var reduce = 1f / (1 << (int)Math.Log(min, 2));
-                    for (var i = 0; i<ColumnCount; i++)
-                    {
-                        Matrix[c, i] *= reduce;
-                    }
+                    Matrix[c, i] *= reduce;
                 }
             }
         }

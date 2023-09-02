@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Shared.LinearSolver
@@ -20,5 +22,21 @@ namespace Shared.LinearSolver
             }
             return a;
         }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct ConverterStruct
+        {
+            [FieldOffset(0)] public int asInt;
+            [FieldOffset(0)] public float asFloat;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int Log2Floor(float val)
+        {
+            ConverterStruct a; a.asInt = 0; a.asFloat = val;
+            return ((a.asInt >> 23) + 1) & 0x7F;
+        }
+
+        public static int Log2FloorReference(float val) => (int)Math.Log(val, 2);
     }
 }
