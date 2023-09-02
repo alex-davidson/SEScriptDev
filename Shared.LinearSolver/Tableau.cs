@@ -19,9 +19,9 @@ namespace Shared.LinearSolver
         public int ArtificialVariableCount { get; private set; }
         public readonly int ConstraintCount;
 
-        public int TargetColumn => ColumnCount - 1;
-        public int Phase2OptimiseColumn => ColumnCount - 3;
-        public int Phase1OptimiseColumn => ColumnCount - 2;
+        public readonly int TargetColumn;
+        public int Phase2OptimiseColumn;
+        public int Phase1OptimiseColumn;
         public int SolveFor => firstSurplusVariable + SurplusVariableCount;
         public readonly int RowCount;
         public readonly int ColumnCount;
@@ -52,12 +52,16 @@ namespace Shared.LinearSolver
             ColumnCount = 3 + variableCount + constraintCount + constraintCount;
             RowCount = 2 + constraintCount;
 
+            TargetColumn = ColumnCount - 1;
+            Phase2OptimiseColumn = ColumnCount - 3;
+            Phase1OptimiseColumn = ColumnCount - 2;
+
             // Initialised with zeroes.
             BasicVariables = new int[RowCount];
             Matrix = new float[RowCount, ColumnCount];
         }
 
-        public int[] BasicVariables { get; }
+        public readonly int[] BasicVariables;
         /// <remarks>
         ///                 x1 ... xn   s1 ... sn   a1 ... an   z   z'  |   target
         /// Phase I                                                 1   |
@@ -66,7 +70,7 @@ namespace Shared.LinearSolver
         /// constraints                                                 |
         /// ...                                                         |
         /// </remarks>
-        public float[,] Matrix { get; }
+        public readonly float[,] Matrix;
 
         public int AddSurplusVariable()
         {
