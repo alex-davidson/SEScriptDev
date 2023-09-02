@@ -101,7 +101,7 @@ namespace Shared.LinearSolver
             {
                 var min = float.MaxValue;
                 var max = 0f;
-                for (var i = 0; i<ColumnCount; i++)
+                for (var i = 0; i < ColumnCount; i++)
                 {
                     var cell = Matrix[c, i];
                     if (cell == 0) continue;
@@ -110,12 +110,13 @@ namespace Shared.LinearSolver
                     if (cell > max) max = cell;
                 }
                 // Try to reduce numbers in the target row, without losing (significant) accuracy.
-                // if (min == float.MaxValue) continue;
+                // If min == float.MaxValue then max is still 0, so no need to check that here.
                 if (max <= maxMagnitude) continue;
                 if (min <= minMagnitude) continue;
 
+                // Reduce by powers of two: adjust the exponent only, keeping all bits of the mantissa.
                 var reduce = 1f / (1 << MathOp.Log2Floor(min));
-                for (var i = 0; i<ColumnCount; i++)
+                for (var i = 0; i < ColumnCount; i++)
                 {
                     Matrix[c, i] *= reduce;
                 }

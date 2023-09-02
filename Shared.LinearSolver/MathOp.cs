@@ -37,6 +37,7 @@ namespace Shared.LinearSolver
             return ((a.asInt >> 23) + 1) & 0x7F;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Log2FloorReference(float val) => (int)Math.Log(val, 2);
     }
 }
