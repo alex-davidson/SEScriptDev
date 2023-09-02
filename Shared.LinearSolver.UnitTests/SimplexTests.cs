@@ -389,7 +389,7 @@ namespace Shared.LinearSolver.UnitTests
         public void FuzzTest()
         {
             var random = new Random();
-            const int tests = 10000;
+            const int tests = 1000000;
 
             for (var i = 0; i < tests; i++)
             {
