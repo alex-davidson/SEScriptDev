@@ -4,18 +4,18 @@ namespace Shared.LinearSolver.UnitTests.Debug
 {
     internal static class DebugWriterExtensions
     {
-        public static void Write(this IDebugWriter writer, string phase, Tableau tableau)
+        public static void Write(this IDebugWriter writer, string phase, ref Tableau tableau)
         {
             if (writer == null) return;
             writer.Write(phase);
-            writer.Write(new TableauRenderer().Render(tableau));
+            writer.Write(new TableauRenderer().Render(ref tableau));
             var sb = new StringBuilder();
             for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
                 var basic = tableau.BasicVariables[c];
                 sb.Append(tableau.GetVariableName(basic));
                 sb.Append(" = ");
-                var resultType = SimplexOp.TryGetBasicSolution(tableau, basic, out var value);
+                var resultType = SimplexOp.TryGetBasicSolution(ref tableau, basic, out var value);
                 if (resultType == BasicSolutionType.Unique)
                 {
                     sb.Append(value);

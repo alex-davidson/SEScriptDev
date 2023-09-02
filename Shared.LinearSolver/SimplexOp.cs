@@ -22,9 +22,9 @@ namespace Shared.LinearSolver
         /// * Used to extract solution values of basic variables.
         /// * Used as per Bland's Rule for choosing pivots.
         /// </remarks>
-        public static float Score(Tableau tableau, int row, int column) => tableau.Matrix[row, tableau.TargetColumn] / tableau.Matrix[row, column];
+        public static float Score(ref Tableau tableau, int row, int column) => tableau.Matrix[row, tableau.TargetColumn] / tableau.Matrix[row, column];
 
-        public static bool MaximiseStep(Tableau tableau, IDebugWriter debugWriter)
+        public static bool MaximiseStep(ref Tableau tableau, IDebugWriter debugWriter)
         {
             // Eliminate each variable from all but one row.
             // Must include surplus variables in this.
@@ -33,19 +33,19 @@ namespace Shared.LinearSolver
                 var eliminateCoefficient = tableau.Matrix[Tableau.Phase2ObjectiveRow, i];
                 if (eliminateCoefficient >= 0) continue;   // Nothing to eliminate in row 0?
 
-                if (!TrySelectPivotRow(tableau, i, out var leavingRow, debugWriter)) continue;
-                if (TryPivot(tableau, i, leavingRow, debugWriter)) return true;
+                if (!TrySelectPivotRow(ref tableau, i, out var leavingRow, debugWriter)) continue;
+                if (TryPivot(ref tableau, i, leavingRow, debugWriter)) return true;
                 // Nothing to eliminate?
             }
             return false;
         }
 
-        public static BasicSolutionType CollectSolution(Tableau tableau, float[] solution)
+        public static BasicSolutionType CollectSolution(ref Tableau tableau, float[] solution)
         {
             var type = BasicSolutionType.Unique;
             for (var i = 0; i < tableau.VariableCount; i++)
             {
-                if (TryGetBasicSolution(tableau, i, out solution[i]) == BasicSolutionType.NotUnique)
+                if (TryGetBasicSolution(ref tableau, i, out solution[i]) == BasicSolutionType.NotUnique)
                 {
                     type = BasicSolutionType.NotUnique;
                 }
@@ -53,7 +53,7 @@ namespace Shared.LinearSolver
             return type;
         }
 
-        public static bool TryPivot(Tableau tableau, int enteringColumn, int leavingRow, IDebugWriter debugWriter)
+        public static bool TryPivot(ref Tableau tableau, int enteringColumn, int leavingRow, IDebugWriter debugWriter)
         {
             var leavingColumn = tableau.BasicVariables[leavingRow];
             if (leavingColumn == enteringColumn) throw new InvalidOperationException("Entering and leaving variables must be different.");
@@ -67,7 +67,7 @@ namespace Shared.LinearSolver
         }
 
 
-        private static bool TrySelectPivotRow(Tableau tableau, int pivotColumn, out int pivotRow, IDebugWriter debugWriter)
+        private static bool TrySelectPivotRow(ref Tableau tableau, int pivotColumn, out int pivotRow, IDebugWriter debugWriter)
         {
             pivotRow = 0;
             var best = float.MaxValue;
@@ -75,7 +75,7 @@ namespace Shared.LinearSolver
             {
                 if (tableau.Matrix[c, pivotColumn] == 0) continue;
                 if (tableau.BasicVariables[c] == pivotColumn) continue; // Cannot pivot a variable on itself.
-                var candidate = Score(tableau, c, pivotColumn);
+                var candidate = Score(ref tableau, c, pivotColumn);
                 debugWriter?.Write($"Candidate row: {tableau.GetRowName(c)} = {candidate} (pivot {tableau.Matrix[c, pivotColumn]})");
 
                 // We don't care whether the candidate score is positive, only that the pivot coefficient is.
@@ -89,7 +89,7 @@ namespace Shared.LinearSolver
             return pivotRow != 0;
         }
 
-        public static bool TrySelectPivotColumn(Tableau tableau, int pivotRow, out int pivotColumn, IDebugWriter debugWriter)
+        public static bool TrySelectPivotColumn(ref Tableau tableau, int pivotRow, out int pivotColumn, IDebugWriter debugWriter)
         {
             pivotColumn = -1;
             var best = float.MaxValue;
@@ -97,7 +97,7 @@ namespace Shared.LinearSolver
             {
                 if (tableau.Matrix[pivotRow, i] == 0) continue;
                 if (tableau.BasicVariables[pivotRow] == i) continue; // Cannot pivot a variable on itself.
-                var candidate = Score(tableau, pivotRow, i);
+                var candidate = Score(ref tableau, pivotRow, i);
                 debugWriter?.Write($"Candidate column: {tableau.GetVariableName(i)} = {candidate} (pivot {tableau.Matrix[pivotRow, i]})");
 
                 // We don't care whether the candidate score is positive, only that the pivot coefficient is.
@@ -136,7 +136,7 @@ namespace Shared.LinearSolver
             return true;
         }
 
-        public static BasicSolutionType TryGetBasicSolution(Tableau tableau, int variable, out float value)
+        public static BasicSolutionType TryGetBasicSolution(ref Tableau tableau, int variable, out float value)
         {
             value = 0;
             if (tableau.Matrix[tableau.ObjectiveRow, variable] != 0) return BasicSolutionType.NonBasicVariable;
@@ -146,7 +146,7 @@ namespace Shared.LinearSolver
             for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
                 if (tableau.Matrix[c, variable] == 0) continue;
-                value = Score(tableau, c, variable);
+                value = Score(ref tableau, c, variable);
                 if (alreadyGotValue) return BasicSolutionType.NotUnique;
                 alreadyGotValue = true;
             }
