@@ -15,6 +15,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Constraints\LinearConstraint.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DebugWriter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)IDebugWriter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MathOp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)MatrixOp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SimplexOp.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)SimplexResult.cs" />
