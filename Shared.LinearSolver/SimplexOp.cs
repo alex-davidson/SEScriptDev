@@ -61,6 +61,7 @@ namespace Shared.LinearSolver
             MatrixOp.Pivot(tableau.Matrix, enteringColumn, leavingRow);
 
             tableau.BasicVariables[leavingRow] = enteringColumn;
+            tableau.Reduce();
             return true;
         }
 

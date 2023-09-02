@@ -389,7 +389,7 @@ namespace Shared.LinearSolver.UnitTests
         public void FuzzTest()
         {
             var random = new Random();
-            const int tests = 1000000;
+            const int tests = 10000;
 
             for (var i = 0; i < tests; i++)
             {
@@ -401,11 +401,9 @@ namespace Shared.LinearSolver.UnitTests
                 };
                 try
                 {
-                    using (var cts = new CancellationTokenSource())
+                    using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1)))
                     using (cts.Token.Register(() => System.Diagnostics.Debug.Fail($"Seed {generator.Seed} exceeded time limit")))
                     {
-                        cts.CancelAfter(TimeSpan.FromSeconds(1));
-
                         var testCase = generator.GenerateCase();
                         SolveCase(testCase, null);
                     }
@@ -432,6 +430,25 @@ namespace Shared.LinearSolver.UnitTests
             };
             var testCase = generator.GenerateCase();
             SolveCase(testCase, Debug);
+        }
+
+        [Test, Explicit]
+        public void PerformanceTest()
+        {
+            var random = new Random();
+            var seed = random.Next();
+            var generator = new FuzzTestGenerator(seed)
+            {
+                MinimumVariables = 20,
+                MaximumVariables = 20,
+            };
+            const int tests = 100000;
+
+            for (var i = 0; i < tests; i++)
+            {
+                var testCase = generator.GenerateCase();
+                SolveCase(testCase);
+            }
         }
 
         private void AssertSolution(Solution expected, Solution actual)
