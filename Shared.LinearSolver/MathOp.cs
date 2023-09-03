@@ -30,6 +30,11 @@ namespace Shared.LinearSolver
             [FieldOffset(0)] public float asFloat;
         }
 
+        /// <summary>
+        /// Fast FLOOR(LOG2(float)) using bitwise ops to extract the exponent of a normalised float.
+        /// </summary>
+        /// <param name="val"></param>
+        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Log2Floor(float val)
         {

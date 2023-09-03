@@ -382,15 +382,19 @@ namespace Shared.LinearSolver.UnitTests
         [TestCaseSource(nameof(Cases))]
         public void Test(Case testCase)
         {
-            var solution = SolveCase(testCase, Debug);
+            var baseline = SolveCaseBaseline(testCase, out _);
+            var solution = SolveCase(testCase, out _, Debug);
             AssertSolution(testCase.Expected, solution);
+            AssertSolversAgree(baseline, solution);
         }
 
         [Test, Explicit]
         public void FuzzTest()
         {
             var random = new Random();
-            const int tests = 10000;
+            const int tests = 100000;
+
+            var counts = new int[4];
 
             for (var i = 0; i < tests; i++)
             {
@@ -406,13 +410,21 @@ namespace Shared.LinearSolver.UnitTests
                     using (cts.Token.Register(() => System.Diagnostics.Debug.Fail($"Seed {generator.Seed} exceeded time limit")))
                     {
                         var testCase = generator.GenerateCase();
-                        SolveCase(testCase, null);
+                        var solution = SolveCase(testCase, out _);
+                        var baseline = SolveCaseBaseline(testCase, out _);
+                        AssertSolversAgree(baseline, solution);
+                        counts[(int)baseline.Result]++;
                     }
                 }
                 catch (Exception ex)
                 {
                     Assert.Fail($"Failed for seed {seed}\n{ex}");
                 }
+            }
+
+            foreach (var resultType in Enum.GetValues(typeof(SimplexResult)))
+            {
+                Console.WriteLine($"{resultType}: {counts[(int)resultType]}");
             }
         }
 
@@ -421,21 +433,28 @@ namespace Shared.LinearSolver.UnitTests
         [TestCase(197840323)]
         [TestCase(2026819511)]
         [TestCase(812444773)]
+        [TestCase(1254073033)]
+        [TestCase(2036017711)]
+        [TestCase(2017604712)]
         [Timeout(1000)]
         public void TestKnownSeeds(int seed)
         {
             var generator = new FuzzTestGenerator(seed)
             {
-                MinimumVariables = 2,
-                MaximumVariables = 4,
+                MinimumVariables = 20,
+                MaximumVariables = 40,
             };
             var testCase = generator.GenerateCase();
-            SolveCase(testCase, Debug);
+            var solution = SolveCase(testCase, out _, Debug);
+            var baseline = SolveCaseBaseline(testCase, out _);
+            AssertSolversAgree(baseline, solution);
         }
 
         [Test, Explicit]
         public void PerformanceTest()
         {
+            var epsilons = new List<float>();
+
             var random = new Random();
             var seed = random.Next();
             var generator = new FuzzTestGenerator(seed)
@@ -445,24 +464,240 @@ namespace Shared.LinearSolver.UnitTests
             };
             const int tests = 100000;
 
+            var counts = new int[4];
+
             for (var i = 0; i < tests; i++)
             {
                 var testCase = generator.GenerateCase();
-                SolveCase(testCase);
+                var result = SolveCase(testCase, out var worstEpsilon);
+                if (worstEpsilon != null) epsilons.Add(worstEpsilon.Value);
+                counts[(int)result.Result]++;
+            }
+
+            foreach (var resultType in Enum.GetValues(typeof(SimplexResult)))
+            {
+                Console.WriteLine($"{resultType}: {counts[(int)resultType]}");
+            }
+            if (epsilons.Any())
+            {
+                Console.WriteLine($"Epsilon: worst {epsilons.Max()}, best {epsilons.Min()}");
+            }
+        }
+
+        [Test, Explicit]
+        public void PerformanceTestBaseline()
+        {
+            var epsilons = new List<float>();
+
+            var random = new Random();
+            var seed = random.Next();
+            var generator = new FuzzTestGenerator(seed)
+            {
+                MinimumVariables = 20,
+                MaximumVariables = 20,
+            };
+            const int tests = 100000;
+
+            var counts = new int[4];
+
+            for (var i = 0; i < tests; i++)
+            {
+                var testCase = generator.GenerateCase();
+                var result = SolveCaseBaseline(testCase, out var worstEpsilon);
+                if (worstEpsilon != null) epsilons.Add(worstEpsilon.Value);
+                counts[(int)result.Result]++;
+            }
+
+            foreach (var resultType in Enum.GetValues(typeof(SimplexResult)))
+            {
+                Console.WriteLine($"{resultType}: {counts[(int)resultType]}");
+            }
+            if (epsilons.Any())
+            {
+                Console.WriteLine($"Epsilon: worst {epsilons.Max()}, best {epsilons.Min()}");
             }
         }
 
         private void AssertSolution(Solution expected, Solution actual)
         {
-            Assert.That(actual.Values, Is.EqualTo(expected.Values)); ;
-            Assert.That(actual.Optimised, Is.EqualTo(expected.Optimised));
-            Assert.That(actual.Result, Is.EqualTo(expected.Result));
+            Assert.Multiple(() =>
+            {
+                Assert.That(actual.Result, Is.EqualTo(expected.Result));
+                Assert.That(actual.Values, Is.EqualTo(expected.Values));
+                Assert.That(actual.Optimised, Is.EqualTo(expected.Optimised));
+            });
         }
 
-        private Solution SolveCase(Case testCase, IDebugWriter debug = null)
+        private void AssertSolversAgree(Solution baseline, Solution actual)
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(actual.Result, Is.EqualTo(baseline.Result));
+                Assert.That(actual.Optimised, Is.EqualTo(baseline.Optimised).Within(0.00001f));
+            });
+        }
+
+        private Solution SolveCase(Case testCase, out float? worstEpsilon, IDebugWriter debug = null)
         {
             var solver = SimplexSolver.Given(testCase.Constraints, debug);
-            return testCase.IsMaximise ? solver.Maximise(testCase.Maximise.ToArray()) : solver.Minimise(testCase.Minimise.ToArray());
+            var result = testCase.IsMaximise ? solver.Maximise(testCase.Maximise.ToArray()) : solver.Minimise(testCase.Minimise.ToArray());
+            worstEpsilon = GetWorstEpsilon(testCase, result);
+            return result;
+        }
+
+        private Solution SolveCaseBaseline(Case testCase, out float? worstEpsilon)
+        {
+            worstEpsilon = null;
+            alglib.minlpcreate(testCase.Constraints.VariableCount, out var state);
+            if (testCase.IsMaximise)
+            {
+                alglib.minlpsetcost(state, testCase.Maximise.Select(x => -(double)x).ToArray());
+            }
+            else
+            {
+                alglib.minlpsetcost(state, testCase.Minimise.Select(x => (double)x).ToArray());
+            }
+
+            alglib.minlpsetbcall(state, 0, double.PositiveInfinity);
+
+            // Epsilon 0 = 'figure it out'.
+            alglib.minlpsetalgodss(state, 0);
+            foreach (var constraint in testCase.Constraints)
+            {
+                var coefficients = constraint.Coefficients.Select(x => (double)x).ToArray();
+                switch (constraint.SurplusCoefficient)
+                {
+                    case -1: // >=
+                        alglib.minlpaddlc2dense(state, coefficients, constraint.Target, double.PositiveInfinity);
+                        break;
+
+                    case 0: // ==
+                        alglib.minlpaddlc2dense(state, coefficients, constraint.Target, constraint.Target);
+                        break;
+
+                    case 1: // <=
+                        alglib.minlpaddlc2dense(state, coefficients, double.NegativeInfinity, constraint.Target);
+                        break;
+
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+
+            alglib.minlpoptimize(state);
+
+            alglib.minlpresults(state, out var vec, out var rep);
+
+            switch (rep.terminationtype)
+            {
+                case -4:
+                    return new Solution
+                    {
+                        Result = SimplexResult.Unbounded,
+                    };
+                case -3:
+                    return new Solution
+                    {
+                        Result = SimplexResult.NoSolution,
+                    };
+                case -2:
+                    return new Solution
+                    {
+                        Result = SimplexResult.NoSolution,
+                    };
+                case 1:
+                case 2:
+                case 3:
+                case 4:
+
+                    var result = new Solution
+                    {
+                        Result = SimplexResult.OptimalSolution,
+                        Optimised = testCase.IsMaximise ? -(float)rep.f : (float)rep.f,
+                        Values = vec.Select(x => (float)x).ToArray(),
+                    };
+                    worstEpsilon = GetWorstEpsilon(testCase, result);
+                    return result;
+                case 5:
+                    // Ran out of time.
+                    return new Solution
+                    {
+                        Result = SimplexResult.NoSolution,
+                    };
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
+
+        private float? GetWorstEpsilon(Case testCase, Solution solution)
+        {
+            if (solution.Result == SimplexResult.NoSolution) return null;
+            if (solution.Result == SimplexResult.Unbounded) return null;
+
+            var epsilonLimit = 1f;
+            var worstEpsilon = 0f;
+            foreach (var constraint in testCase.Constraints)
+            {
+                var acc = 0f;
+                for (var i = 0; i < testCase.Constraints.VariableCount; i++)
+                {
+                    acc += (constraint.Coefficients[i] * solution.Values[i]);
+                }
+                var diff = acc - constraint.Target;
+
+                switch (constraint.SurplusCoefficient)
+                {
+                    case -1: // >=
+                        if (diff < 0)
+                        {
+                            worstEpsilon = Math.Max(Math.Abs(diff), worstEpsilon);
+                            if (diff < -epsilonLimit)
+                            {
+                                Console.WriteLine($"FAIL: {acc} >= {constraint.Target}: diff is {diff}");
+                            }
+                        }
+                        break;
+
+                    case 0: // ==
+                        if (diff < 0)
+                        {
+                            worstEpsilon = Math.Max(Math.Abs(diff), worstEpsilon);
+                            if (diff < -epsilonLimit)
+                            {
+                                Console.WriteLine($"FAIL: {acc} == {constraint.Target}: diff is {diff}");
+                            }
+                        }
+
+                        if (diff > 0)
+                        {
+                            worstEpsilon = Math.Max(Math.Abs(diff), worstEpsilon);
+                            if (diff > epsilonLimit)
+                            {
+                                Console.WriteLine($"FAIL: {acc} == {constraint.Target}: diff is {diff}");
+                            }
+                        }
+                        break;
+
+                    case 1: // <=
+                        if (diff > 0)
+                        {
+                            worstEpsilon = Math.Max(Math.Abs(diff), worstEpsilon);
+                            if (diff > epsilonLimit)
+                            {
+                                Console.WriteLine($"FAIL: {acc} <= {constraint.Target}: diff is {diff}");
+                            }
+                        }
+                        break;
+
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+            }
+            if (worstEpsilon > epsilonLimit)
+            {
+                Assert.Fail("FATAL: Solution is not within a sane epsilon of valid.");
+            }
+            return worstEpsilon;
         }
     }
 }
