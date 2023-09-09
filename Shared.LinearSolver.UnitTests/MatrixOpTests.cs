@@ -11,41 +11,40 @@ namespace Shared.LinearSolver.UnitTests
     public class MatrixOpTests
     {
         [Test]
-        public void Reduce()
+        public void ReduceRowsTest()
         {
             var random = new Random(42);
             const int caseCount = 5000000;
             const int columnCount = 4;
             var cases = new float[caseCount, columnCount];
+            var results = new float[caseCount, columnCount];
+
             for (var i = 0; i < caseCount; i++)
             {
                 var magnitude = (float)Math.Pow(2, random.Next(-60, 60));
-                cases[i, 0] = magnitude;    // Baseline.
+                cases[i, 0] = magnitude;    // Baseline
+                results[i, 0] = magnitude;
                 for (var j = 1; j < columnCount; j++)
                 {
                     cases[i, j] = NextFloat(random, -60, 60) * magnitude;
+                    results[i, j] = cases[i, j];
                 }
             }
 
+            MatrixOp.ReduceRows(results, caseCount, columnCount);
+
             for (var i = 0; i < caseCount; i++)
             {
-                var sign = Math.Sign(cases[i, 0]);
-                var baseline = new float[columnCount];
-                
-                for (var j = 0; j < columnCount; j++)
+                Assert.Multiple(() =>
                 {
-                    baseline[j] = cases[i, 0] / cases[i, j];
-                }
-
-                MatrixOp.Reduce(cases, i, columnCount);
-
-                var comparison = new float[columnCount];
-                for (var j = 0; j < columnCount; j++)
-                {
-                    comparison[j] = cases[i, 0] / cases[i, j];
-                }
-                Assert.That(comparison, Is.EqualTo(baseline));
-                Assert.That(Math.Sign(cases[i, 0]), Is.EqualTo(sign));
+                    Assert.That(Math.Sign(results[i, 0]), Is.EqualTo(Math.Sign(cases[i, 0])));
+                    for (var j = 0; j < columnCount; j++)
+                    {
+                        var baseline = cases[i, 0] / cases[i, j];
+                        var comparison = results[i, 0] / results[i, j];
+                        Assert.That(comparison, Is.EqualTo(baseline));
+                    }
+                });
             }
         }
 

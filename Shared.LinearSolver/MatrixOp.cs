@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Shared.LinearSolver
@@ -69,48 +70,52 @@ namespace Shared.LinearSolver
         /// Multiplication and division are expensive operations though, so instead we do integer addition and
         /// subtraction on the exponents themselves, using bithacks.
         /// </remarks>
-        public static void Reduce(float[,] matrix, int row, int columnCount)
+        public static void ReduceRows(float[,] matrix, int rowCount, int columnCount)
         {
             const uint exponentBits = 0xFF << 23;
             const uint signBit = 0x80000000;
+            const uint midpoint = 127 << 23;
+            const uint maxExponent = 255 << 23;
 
-            // Operate directly on the biased exponent in order to save operations. 127 = 2^0.
-            uint min = 255;
-            uint max = 0;
-            for (var i = 0; i < columnCount; i++)
+            for (var r = 0; r < rowCount; r++)
             {
-                ConverterStruct a; a.asUint = 0;
-                a.asFloat = matrix[row, i];
-                if (a.asFloat == 0) continue;   // Ignore zeroes.
-                var biasedExponent = (a.asUint >> 23) & 0xFF;
-                min = Math.Min(min, biasedExponent);
-                max = Math.Max(max, biasedExponent);
-            }
-            // If any float is subnormal/special, don't touch anything.
-            if (min == 0) return;
-            if (max == 255) return;
-            // No updates?
-            if (max == 0) return;
+                // Operate directly on the biased exponent in order to save operations. 127 = 2^0.
+                uint min = maxExponent;
+                uint max = 0;
+                for (var c = 0; c < columnCount; c++)
+                {
+                    ConverterStruct a; a.asUint = 0;
+                    a.asFloat = matrix[r, c];
+                    if (a.asFloat == 0) continue;   // Ignore zeroes.
+                    var biasedExponent = a.asUint & exponentBits;
+                    if (min > biasedExponent) min = biasedExponent;
+                    if (max < biasedExponent) max = biasedExponent;
+                }
+                // If any float is subnormal/special, don't touch anything.
+                if (min == 0) continue;
+                if (max == maxExponent) continue;
+                // No updates?
+                if (max == 0) continue;
 
-            // We're trying to recentre the range around 0.
-            // var midpoint = (max + min) >> 1;
-            // var adjust = ((midpoint - 127) & 0xFF) << 23;
-            // The following does exactly the same, with fewer operations and without losing the LSB.
-            var adjust = ((max + min - 254) & 0x01FE) << 22;
-            if (adjust == 0) return;
+                // We're trying to recentre the range around 0, and do it without repeated
+                // shifting left and right.
+                var adjust = (((max + min) >> 1) - midpoint) & exponentBits;
+                //if (adjust == 0) return;
 
-            // Adjust the exponent only, keeping all bits of the mantissa.
-            // Need to keep the sign bit untouched, too.
-            for (var i = 0; i < columnCount; i++)
-            {
-                ConverterStruct a; a.asUint = 0;
-                a.asFloat = matrix[row, i];
-                if (a.asFloat == 0) continue;   // Ignore zeroes.
-                var sign = a.asUint & signBit;
-                var adjusted = a.asUint - adjust;
-                a.asUint = (adjusted & ~signBit) | sign;
-                if (float.IsNaN(a.asFloat)) throw new Exception();
-                matrix[row, i] = a.asFloat;
+                // Adjust the exponent only, keeping all bits of the mantissa.
+                // Need to keep the sign bit untouched, too.
+                for (var c = 0; c < columnCount; c++)
+                {
+                    ConverterStruct a; a.asUint = 0;
+                    a.asFloat = matrix[r, c];
+                    if (a.asFloat == 0) continue;   // Ignore zeroes.
+                    var sign = a.asUint & signBit;
+                    var adjusted = a.asUint - adjust;
+                    a.asUint = (adjusted & ~signBit) | sign;
+                    if (a.asFloat == 0) throw new Exception();
+                    if (float.IsNaN(a.asFloat)) throw new Exception();
+                    matrix[r, c] = a.asFloat;
+                }
             }
         }
     }

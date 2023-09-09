@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Shared.LinearSolver.UnitTests.Debug;
 
 namespace Shared.LinearSolver
 {
@@ -95,10 +96,7 @@ namespace Shared.LinearSolver
 
         public void Reduce()
         {
-            for (var r = 0; r < RowCount; r++)
-            {
-                MatrixOp.Reduce(Matrix, r, ColumnCount);
-            }
+            MatrixOp.ReduceRows(Matrix, RowCount, ColumnCount);
         }
 
         internal string GetRowName(int c)
