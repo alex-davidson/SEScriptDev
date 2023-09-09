@@ -32,14 +32,13 @@ namespace Shared.LinearSolver
 
         /// <summary>
         /// Fast FLOOR(LOG2(float)) using bitwise ops to extract the exponent of a normalised float.
+        /// DOES NOT WORK for negative numbers. At all. You will get nonsense back.
         /// </summary>
-        /// <param name="val"></param>
-        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Log2Floor(float val)
         {
             ConverterStruct a; a.asInt = 0; a.asFloat = val;
-            return ((a.asInt >> 23) + 1) & 0x7F;
+            return (a.asInt >> 23) - 127;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

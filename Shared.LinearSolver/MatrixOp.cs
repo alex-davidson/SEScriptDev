@@ -50,5 +50,32 @@ namespace Shared.LinearSolver
                 matrix[targetRow, i] -= matrix[subtractRow, i];
             }
         }
+
+        public static void Reduce(float[,] matrix, int row, int columnCount)
+        {
+            const float minMagnitude = 1;
+            const float maxMagnitude = 8192;
+            var min = float.MaxValue;
+            var max = 0f;
+            for (var i = 0; i < columnCount; i++)
+            {
+                var cell = matrix[row, i];
+                if (cell == 0) continue;
+                if (cell < 0) cell = -cell;
+                if (cell < min) min = cell;
+                if (cell > max) max = cell;
+            }
+            // Try to reduce numbers in the target row, without losing (significant) accuracy.
+            // If min == float.MaxValue then max is still 0, so no need to check that here.
+            if (max <= maxMagnitude) return;
+            if (min <= minMagnitude) return;
+
+            // Reduce by powers of two: adjust the exponent only, keeping all bits of the mantissa.
+            var reduce = 1f / (float)(Math.Pow(2, (int)Math.Log(min, 2)));
+            for (var i = 0; i < columnCount; i++)
+            {
+                matrix[row, i] *= reduce;
+            }
+        }
     }
 }
