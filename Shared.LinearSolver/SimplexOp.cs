@@ -73,13 +73,12 @@ namespace Shared.LinearSolver
             var best = float.MaxValue;
             for (var c = Tableau.FirstConstraintRow; c < tableau.RowCount; c++)
             {
-                if (tableau.Matrix[c, pivotColumn] == 0) continue;
+                // We don't care whether the candidate score is positive, only that the pivot coefficient is.
+                if (tableau.Matrix[c, pivotColumn] <= 0) continue;
                 if (tableau.BasicVariables[c] == pivotColumn) continue; // Cannot pivot a variable on itself.
                 var candidate = Score(ref tableau, c, pivotColumn);
                 debugWriter?.Write($"Candidate row: {tableau.GetRowName(c)} = {candidate} (pivot {tableau.Matrix[c, pivotColumn]})");
 
-                // We don't care whether the candidate score is positive, only that the pivot coefficient is.
-                if (tableau.Matrix[c, pivotColumn] < 0) continue;
                 if (candidate >= best) continue;
                 if (!CheckValidityOfBasicResult(tableau, c, pivotColumn, debugWriter)) continue;
 
@@ -95,13 +94,12 @@ namespace Shared.LinearSolver
             var best = float.MaxValue;
             for (var i = 0; i < tableau.SolveFor; i++)
             {
-                if (tableau.Matrix[pivotRow, i] == 0) continue;
+                // We don't care whether the candidate score is positive, only that the pivot coefficient is.
+                if (tableau.Matrix[pivotRow, i] <= 0) continue;
                 if (tableau.BasicVariables[pivotRow] == i) continue; // Cannot pivot a variable on itself.
                 var candidate = Score(ref tableau, pivotRow, i);
                 debugWriter?.Write($"Candidate column: {tableau.GetVariableName(i)} = {candidate} (pivot {tableau.Matrix[pivotRow, i]})");
 
-                // We don't care whether the candidate score is positive, only that the pivot coefficient is.
-                if (tableau.Matrix[pivotRow, i] < 0) continue;
                 if (candidate >= best) continue;
                 if (!CheckValidityOfBasicResult(tableau, pivotRow, i, debugWriter)) continue;
 
