@@ -82,6 +82,7 @@ namespace Shared.LinearSolver
             var uintMatrix = conv.asUint;
 
             const uint exponentBits = 0xFF << 23;
+            const uint significantExponentBits = 0xFC << 23;
             const uint signBit = 0x80000000;
             const uint midpoint = 127 << 23;
             const uint maxExponent = 255 << 23;
@@ -109,7 +110,8 @@ namespace Shared.LinearSolver
                 // We're trying to recentre the range around 0, and do it without repeated
                 // shifting left and right.
                 var adjust = (((max + min) >> 1) - midpoint) & exponentBits;
-                //if (adjust == 0) return;
+                // Ignore small downward reductions, since they're fast to detect.
+                if ((adjust & significantExponentBits) == 0) continue;
 
                 // Adjust the exponent only, keeping all bits of the mantissa.
                 // Need to keep the sign bit untouched, too.
