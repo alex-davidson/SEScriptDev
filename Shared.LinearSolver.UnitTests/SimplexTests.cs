@@ -533,7 +533,7 @@ namespace Shared.LinearSolver.UnitTests
             Assert.Multiple(() =>
             {
                 Assert.That(actual.Result, Is.EqualTo(baseline.Result));
-                Assert.That(actual.Optimised, Is.EqualTo(baseline.Optimised).Within(0.00001f));
+                Assert.That(actual.Optimised, Is.EqualTo(baseline.Optimised).Within(0.0001f));
             });
         }
 

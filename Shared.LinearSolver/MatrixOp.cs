@@ -32,7 +32,6 @@ namespace Shared.LinearSolver
                 {
                     // Warning: values can grow large through many eliminations. Might need to rescale periodically.
                     var cell = (matrix[targetRow, i] * pivotCoefficient) - (matrix[pivotRow, i] * eliminateCoefficient);
-                    if (float.IsNaN(cell)) throw new Exception();
                     matrix[targetRow, i] = cell;
                     // Alternative, doesn't suffer from sign problems but does introduce rounding errors:
                     // matrix[targetRow, i] = matrix[targetRow, i] - (matrix[pivotRow, i] * eliminateCoefficient / pivotCoefficient);
@@ -57,8 +56,8 @@ namespace Shared.LinearSolver
         [StructLayout(LayoutKind.Explicit)]
         private struct ConverterStruct
         {
-            [FieldOffset(0)] public uint asUint;
-            [FieldOffset(0)] public float asFloat;
+            [FieldOffset(0)] public uint[,] asUint;
+            [FieldOffset(0)] public float[,] asFloat;
         }
 
         /// <summary>
@@ -67,11 +66,21 @@ namespace Shared.LinearSolver
         /// <remarks>
         /// This effectively works by calculating the midpoint of the exponents of the floats in the row, then
         /// multiplying or dividing the entire row by a power of two so that the midpoint exponent would be 0.
+        ///
         /// Multiplication and division are expensive operations though, so instead we do integer addition and
         /// subtraction on the exponents themselves, using bithacks.
+        ///
+        /// For some reason, neither the C# compiler nor the JIT seem to be reordering things as I'd expect to
+        /// exploit pipelining. At least I assume they aren't, since moving the two 'ignore zeroes' checks to
+        /// lines A and B increases our runtime by about 6%.
         /// </remarks>
         public static void ReduceRows(float[,] matrix, int rowCount, int columnCount)
         {
+            // Type-pun the entire matrix as uint32, so we can use bithacks.
+            // I am amazed that it is legal C# to type-pun an entire array like this, but grateful for it.
+            var conv = new ConverterStruct { asFloat = matrix };
+            var uintMatrix = conv.asUint;
+
             const uint exponentBits = 0xFF << 23;
             const uint signBit = 0x80000000;
             const uint midpoint = 127 << 23;
@@ -84,10 +93,10 @@ namespace Shared.LinearSolver
                 uint max = 0;
                 for (var c = 0; c < columnCount; c++)
                 {
-                    ConverterStruct a; a.asUint = 0;
-                    a.asFloat = matrix[r, c];
-                    if (a.asFloat == 0) continue;   // Ignore zeroes.
-                    var biasedExponent = a.asUint & exponentBits;
+                    var cell = uintMatrix[r, c];
+                    // A
+                    var biasedExponent = cell & exponentBits;
+                    if ((cell & ~signBit) == 0) continue;   // Ignore zeroes.
                     if (min > biasedExponent) min = biasedExponent;
                     if (max < biasedExponent) max = biasedExponent;
                 }
@@ -106,15 +115,12 @@ namespace Shared.LinearSolver
                 // Need to keep the sign bit untouched, too.
                 for (var c = 0; c < columnCount; c++)
                 {
-                    ConverterStruct a; a.asUint = 0;
-                    a.asFloat = matrix[r, c];
-                    if (a.asFloat == 0) continue;   // Ignore zeroes.
-                    var sign = a.asUint & signBit;
-                    var adjusted = a.asUint - adjust;
-                    a.asUint = (adjusted & ~signBit) | sign;
-                    if (a.asFloat == 0) throw new Exception();
-                    if (float.IsNaN(a.asFloat)) throw new Exception();
-                    matrix[r, c] = a.asFloat;
+                    var cell = uintMatrix[r, c];
+                    // B
+                    var sign = cell & signBit;
+                    var adjusted = cell - adjust;
+                    if ((cell & ~signBit) == 0) continue;   // Ignore zeroes.
+                    uintMatrix[r, c] = (adjusted & ~signBit) | sign;
                 }
             }
         }
