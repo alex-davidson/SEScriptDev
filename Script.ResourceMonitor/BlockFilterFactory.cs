@@ -27,7 +27,6 @@ namespace IngameScript
                     names.Add(rule.BlockName);
                 }
             }
-
             // If no rules, include everything.
             if (names.Count == 0) return new BlockRuleFilter();
 

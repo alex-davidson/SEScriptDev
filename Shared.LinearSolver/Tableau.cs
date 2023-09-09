@@ -95,31 +95,9 @@ namespace Shared.LinearSolver
 
         public void Reduce()
         {
-            const float minMagnitude = 1;
-            const float maxMagnitude = 8192;
-            for (var c = 0; c < RowCount; c++)
+            for (var r = 0; r < RowCount; r++)
             {
-                var min = float.MaxValue;
-                var max = 0f;
-                for (var i = 0; i < ColumnCount; i++)
-                {
-                    var cell = Matrix[c, i];
-                    if (cell == 0) continue;
-                    if (cell < 0) cell = -cell;
-                    if (cell < min) min = cell;
-                    if (cell > max) max = cell;
-                }
-                // Try to reduce numbers in the target row, without losing (significant) accuracy.
-                // If min == float.MaxValue then max is still 0, so no need to check that here.
-                if (max <= maxMagnitude) continue;
-                if (min <= minMagnitude) continue;
-
-                // Reduce by powers of two: adjust the exponent only, keeping all bits of the mantissa.
-                var reduce = 1f / (1 << MathOp.Log2Floor(min));
-                for (var i = 0; i < ColumnCount; i++)
-                {
-                    Matrix[c, i] *= reduce;
-                }
+                MatrixOp.Reduce(Matrix, r, ColumnCount);
             }
         }
 
