@@ -37,7 +37,9 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared.LinearSolver", "Shar
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.LinearSolver.UnitTests", "Shared.LinearSolver.UnitTests\Shared.LinearSolver.UnitTests.csproj", "{86BCC3AA-0BEA-4881-BBCE-B1E496FABFEA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LinearSolver.Package", "LinearSolver.Package\LinearSolver.Package.csproj", "{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LinearSolver.Package", "LinearSolver.Package\LinearSolver.Package.csproj", "{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Script.Valves", "Script.Valves\Script.Valves.csproj", "{969A1292-D228-44EA-82F1-A63F9E034047}"
 EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
@@ -58,6 +60,8 @@ Global
 		Shared.LinearSolver\Shared.LinearSolver.projitems*{86bcc3aa-0bea-4881-bbce-b1e496fabfea}*SharedItemsImports = 4
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{91a5b814-20a5-49df-bde9-e299b8e1102c}*SharedItemsImports = 13
 		Shared.Testing\Shared.Testing.projitems*{92f4f198-53a7-479d-b7b5-b1fa0b28a26c}*SharedItemsImports = 4
+		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{969a1292-d228-44ea-82f1-a63f9e034047}*SharedItemsImports = 4
+		Shared.Core\Shared.Core.projitems*{969a1292-d228-44ea-82f1-a63f9e034047}*SharedItemsImports = 4
 		Shared.Testing\Shared.Testing.projitems*{9cf04af5-18c3-4beb-87c1-a5695df0f830}*SharedItemsImports = 4
 		Shared.Core\Shared.Core.projitems*{c1a242ac-8e40-405a-8ff8-93296c80e36f}*SharedItemsImports = 13
 		Shared.Core.Ingame\Shared.Core.Ingame.projitems*{ddd1f60e-8967-411e-8174-830efdf15f3f}*SharedItemsImports = 4
@@ -184,6 +188,13 @@ Global
 		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Release|x64.ActiveCfg = Release|Any CPU
 		{2EA3EC08-3A76-4262-AA49-FCCEE14739A4}.Release|x64.Build.0 = Release|Any CPU
+		{969A1292-D228-44EA-82F1-A63F9E034047}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{969A1292-D228-44EA-82F1-A63F9E034047}.Debug|x64.ActiveCfg = Debug|x64
+		{969A1292-D228-44EA-82F1-A63F9E034047}.Debug|x64.Build.0 = Debug|x64
+		{969A1292-D228-44EA-82F1-A63F9E034047}.Release|Any CPU.ActiveCfg = Debug|x64
+		{969A1292-D228-44EA-82F1-A63F9E034047}.Release|Any CPU.Build.0 = Debug|x64
+		{969A1292-D228-44EA-82F1-A63F9E034047}.Release|x64.ActiveCfg = Debug|x64
+		{969A1292-D228-44EA-82F1-A63F9E034047}.Release|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

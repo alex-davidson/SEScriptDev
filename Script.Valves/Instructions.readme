@@ -1,0 +1,38 @@
+﻿R e a d m e: Valve control script
+---------------------------------
+
+A 'valve' is two pairs of Connectors in a line. Only one pair is locked at a
+time. By alternating the locked pairs, this operates like a one-way pump for
+items *which blocks gasses*.
+
+This script monitors such Connector pairs, alternating the enabled pair every
+few seconds.
+
+QUICK START
+
+Just run this script in a programmable block and name your valve blocks
+appropriately.
+
+Each set of Connector blocks must all share the same name.
+For example, if you have ice being supplied to an independent backup generator
+array, all of the four Connectors must be given the same name eg.
+'Backup Generator Ice (Valve)'.
+
+Sorters should be used to force item flow. At the very least you will need one
+between the Connector pairs. You may also want one to pull items out of the
+downstream pair.
+
+The Connectors SHOULD NOT be configured to Collect All and the script will
+warn about this.
+
+Blocks will be managed as valves if ANY of the following are true:
+
+* The block has the text '(Valve)' in its name.
+* The block is a member of a block group called 'Valves'.
+
+FURTHER INFORMATION
+
+If a block is not a Connector, it will be ignored by this script.
+
+If a set of identically-named Connectors does not have exactly four member
+blocks, it will be ignored.
