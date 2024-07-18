@@ -48,6 +48,9 @@ namespace SharedTesting
 
         public int ItemCount => slots.Count(s => s?.Amount > 0);
 
+        public float VolumeFillFactor => 1;
+        public bool CanPutItems => false;
+
         public abstract bool CanItemsBeAdded(MyFixedPoint amount, MyItemType itemType);
         public abstract bool CanTransferItemTo(IMyInventory otherInventory, MyItemType itemType);
 
